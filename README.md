@@ -1,60 +1,45 @@
-# 🤖 Lab Guide Agent — AI Browser Automation for Azure
+# Lab Guide Generator — Semi-Automated Azure Lab Guide Creation
 
-Generate step-by-step Azure lab guides with **REAL screenshots** by automating the Azure Portal with Playwright + LLM intelligence.
+Generate step-by-step Azure lab guides in **CloudLabs format** with real screenshots. You perform the lab steps while the tool captures screenshots, then AI writes the formatted guide.
 
-## � How It Works
+## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       TASK DESCRIPTION                          │
-│  "Create a Linux VM named lab-vm in East US using Standard_B1s" │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   LLM PLANNER   │  GPT-4o / Azure OpenAI
-                    │  Generates JSON  │  action plan
-                    │  action sequence │
-                    └────────┬────────┘
-                             │
-              ┌──────────────▼──────────────┐
-              │     PLAYWRIGHT EXECUTOR      │
-              │                              │
-              │  For each action:            │
-              │  1. Find element (role/text) │
-              │  2. Scroll into view         │
-              │  3. Execute (click/type/nav) │
-              │  4. Wait for Azure to settle │
-              │  5. Get element.boundingBox()│
-              │  6. Take full screenshot     │
-              │                              │
-              │  On failure:                 │
-              │  → LLM self-correction loop  │
-              │  → Retry with fixed action   │
-              └──────────────┬──────────────┘
-                             │
-              ┌──────────────▼──────────────┐
-              │     SHARP IMAGE PROCESSOR    │
-              │                              │
-              │  1. Detect sidebar (dynamic) │
-              │  2. Crop sidebar from left   │
-              │  3. Adjust bounding box      │
-              │  4. Draw RED RECTANGLE       │
-              │  5. Optimize PNG output      │
-              └──────────────┬──────────────┘
-                             │
-              ┌──────────────▼──────────────┐
-              │     LLM GUIDE BUILDER       │
-              │                              │
-              │  Assembles final Markdown    │
-              │  with embedded screenshots   │
-              │  + YAML front matter         │
-              │  + Objectives/Prerequisites  │
-              │  + Numbered steps            │
-              │  + Validation section        │
-              └─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    ELECTRON DESKTOP APP                          │
+│                                                                  │
+│  ┌──────────────────────────┐  ┌──────────────────────────────┐  │
+│  │     Azure Portal         │  │     Recorder Panel           │  │
+│  │     (WebContentsView)    │  │                              │  │
+│  │                          │  │  1. Set lab title & URL      │  │
+│  │  User navigates and      │  │  2. Click "Capture" per step │  │
+│  │  performs lab steps       │  │  3. Edit screenshots         │  │
+│  │  manually                │  │  4. Add step descriptions    │  │
+│  │                          │  │  5. Click "Generate"         │  │
+│  └──────────────────────────┘  └──────────────┬───────────────┘  │
+│                                               │                  │
+└───────────────────────────────────────────────┼──────────────────┘
+                                                │
+                                     ┌──────────▼──────────┐
+                                     │   Azure OpenAI LLM  │
+                                     │                      │
+                                     │  Receives steps +    │
+                                     │  screenshots and     │
+                                     │  generates CloudLabs │
+                                     │  format Markdown     │
+                                     └──────────┬──────────┘
+                                                │
+                                     ┌──────────▼──────────┐
+                                     │     Output          │
+                                     │                      │
+                                     │  output/<guide>/     │
+                                     │  ├── guide.md        │
+                                     │  ├── manifest.json   │
+                                     │  └── screenshots/    │
+                                     └─────────────────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install
 
@@ -80,135 +65,104 @@ AZURE_OPENAI_API_VERSION=2025-04-01-preview
 # Or use OpenAI directly
 OPENAI_PROVIDER=openai
 OPENAI_API_KEY=sk-...
-
-# Browser
-HEADLESS=false
-SLOW_MO=100
 ```
 
-### 3. First-time Azure Login
+### 3. Run the Desktop App
 
 ```bash
-node src/index.js login
+npm run desktop
 ```
 
-This opens a browser window — complete your Azure login + MFA. The session is saved to `auth.json` for subsequent runs.
+### 4. Record a Lab Guide
 
-### 4. Generate a Lab Guide
+1. Enter lab title and Azure Portal URL in the recorder panel
+2. Click **Start** to begin recording
+3. Navigate the Azure Portal and perform your lab steps
+4. At each key step, click **Capture** to take a screenshot
+5. Click the screenshot thumbnail to open the **editor** — draw annotations (red rectangles), crop, etc.
+6. Add a description for each step
+7. Click **Generate** when done — the LLM produces a CloudLabs-format guide
 
-**CLI:**
+### Alternative: CLI Mode
+
 ```bash
-# Full automation with browser
-node src/index.js generate "Create a Linux VM in East US with Standard_B1s"
+# Interactive CLI recording
+npm run record
 
-# Dry run (plan only, no browser)
-node src/index.js generate --dry-run "Create an Azure Storage Account"
-```
-
-**Web UI:**
-```bash
-node src/index.js serve
-# Open → http://localhost:8000
+# Web UI on localhost:9005
+npm run serve
 ```
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 lab-guide-agent/
+├── desktop.js                    # Electron main process
 ├── package.json
 ├── .env.example
-├── auth.json                     # Saved Azure login (gitignored)
 ├── src/
-│   ├── index.js                  # CLI entry point
+│   ├── index.js                  # CLI entry point (serve / record)
 │   ├── server.js                 # Express API server
 │   ├── config.js                 # Centralized configuration
 │   ├── core/
-│   │   ├── browser.js            # Playwright browser lifecycle
-│   │   ├── auth.js               # Azure Portal login + session persistence
-│   │   ├── navigator.js          # Action execution with retry + fallback
-│   │   └── screenshot.js         # Capture, crop, highlight with Sharp
+│   │   ├── browser.js            # Playwright browser lifecycle (CLI mode)
+│   │   ├── recorder.js           # Recording state + step management
+│   │   └── screenshot.js         # Capture, crop, annotate with Sharp
 │   ├── agent/
-│   │   └── orchestrator.js       # Main agent loop with self-correction
+│   │   └── orchestrator.js       # Session lifecycle orchestrator
 │   ├── services/
-│   │   ├── llm.js                # LLM client (Azure OpenAI / OpenAI)
-│   │   └── guide-builder.js      # Markdown assembly + fallback template
+│   │   ├── llm.js                # Azure OpenAI / OpenAI client
+│   │   └── guide-builder.js      # Output assembly (markdown + screenshots)
 │   ├── utils/
 │   │   ├── logger.js             # Structured Winston logger
-│   │   ├── retry.js              # Exponential backoff utility
-│   │   └── dom-helpers.js        # DOM queries, sidebar detection, stabilization
+│   │   └── dom-helpers.js        # Sidebar detection for screenshot cropping
+│   ├── desktop/
+│   │   ├── app.html              # Desktop app UI (tabs, recorder, preview)
+│   │   ├── preload.cjs           # Electron IPC bridge
+│   │   ├── editor.html           # Screenshot annotation editor (canvas)
+│   │   └── editor-preload.cjs    # Editor window IPC bridge
 │   └── public/
-│       └── index.html            # Web UI (modern dark theme)
-└── output/                       # Generated guides + screenshots
-    ├── screenshots/
+│       └── index.html            # Web UI for CLI serve mode
+└── output/                       # Generated guides
     └── <guide-name>/
         ├── guide.md
-        └── manifest.json
+        ├── manifest.json
+        └── screenshots/
 ```
 
-## 🎯 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/health` | System health + auth status |
-| `POST` | `/api/generate` | Start the agent `{ task, dryRun?, guideName? }` |
+| `GET` | `/api/health` | System health + LLM info |
+| `GET` | `/api/session` | Current session status |
+| `POST` | `/api/session/start` | Start recording session |
+| `POST` | `/api/session/capture` | Capture a step (CLI mode) |
+| `POST` | `/api/desktop/capture` | Capture a step (desktop mode) |
+| `POST` | `/api/desktop/edit-screenshot` | Update screenshot after editing |
+| `PUT` | `/api/session/step/:num` | Update step description |
+| `DELETE` | `/api/session/step/:num` | Delete a step |
+| `POST` | `/api/session/generate` | Generate guide from recorded steps |
 | `GET` | `/api/guides` | List all generated guides |
 | `GET` | `/api/guides/:name` | Get a specific guide's Markdown |
-| `POST` | `/api/close` | Close the browser instance |
+| `POST` | `/api/close` | Close browser instance |
 
-## 🛡️ Error Handling Strategy
-
-### Element Not Found
-1. **Multi-strategy location**: `getByRole()` → `getByLabel()` → `getByText()` → CSS selector → `getByTitle()` → `getByPlaceholder()`
-2. **Visibility check**: Only clicks visible, actionable elements
-3. **Scroll**: Automatically scrolls element into view before interaction
-
-### Dynamic UI
-- `waitForLoadState('domcontentloaded')` after every navigation
-- Spinner detection: monitors Azure Portal loading indicators
-- Animation settle time (800ms) after each operation
-- Element stability check before interaction
-
-### Self-Correction Loop (AI Agent Behavior)
-```
-Action Fails → Capture page state → LLM analyzes failure
-                                     ↓
-                              Suggests fix:
-                              • Corrected selector/role
-                              • Missing prerequisite step
-                              • Wait/scroll needed
-                                     ↓
-                              Retry with fix (up to 3x)
-```
-
-### Retry with Exponential Backoff
-All browser actions retry 3× with exponential backoff (1s → 2s → 4s).
-
-## 🔧 Key Design Decisions
+## Key Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| `getByRole()` over CSS selectors | Azure Portal uses dynamic class names; ARIA roles are stable |
-| `element.boundingBox()` for highlights | Pixel-accurate position from Playwright DOM, not guesswork |
-| Dynamic sidebar detection | Sidebar width varies by resolution and portal state |
-| SVG overlay for red rectangles | Sharp composites SVG — no pixel manipulation needed |
-| `storageState` for auth | Persists cookies + localStorage — survives browser restarts |
-| LLM self-correction | Makes the system an *agent* rather than a fragile script |
+| Semi-automated recording | User controls navigation accuracy; AI handles writing |
+| WebContentsView for portal | Supports Bastion popups with native `window.opener` |
+| Canvas-based screenshot editor | Draw annotations, crop directly before saving |
+| Dynamic sidebar detection | Azure sidebar width varies; auto-cropped from screenshots |
+| SVG overlay for annotations | Sharp composites SVG — clean numbered red circles/rectangles |
+| CloudLabs format output | Standard format with tasks, numbered steps, bold annotations |
 
-## 🚧 Production Scaling Improvements
-
-1. **Parallel guide generation** — Worker queue (Bull/BullMQ) + multiple browser contexts
-2. **Screenshot CDN** — Upload to Azure Blob Storage, use CDN URLs in guides
-3. **Action plan caching** — Cache LLM plans for identical tasks (Redis)
-4. **Visual regression testing** — Compare screenshots across re-runs for drift
-5. **Streaming progress** — WebSocket or SSE for real-time step updates in the UI
-6. **Template library** — Pre-built action plans for common Azure tasks (skip LLM planning)
-7. **Multi-cloud** — Extend navigator for AWS Console, GCP Console
-
-## 🔑 Azure OpenAI Setup
+## Azure OpenAI Setup
 
 1. Go to [Azure Portal](https://portal.azure.com) → **Azure OpenAI** resource
 2. **Keys and Endpoint** → copy Key 1 and Endpoint
-3. **Azure OpenAI Studio** → Deployments → copy your deployment name (e.g., `gpt-4o`)
+3. **Azure OpenAI Studio** → Deployments → copy your deployment name
 4. Set these in `.env`
