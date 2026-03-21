@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' http://localhost:*; img-src 'self' http://localhost:* data:; script-src 'self' 'unsafe-inline';">
+  <title>Lab Guide Recorder</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1e1e1e; color: #d4d4d4; overflow: hidden; }
+
+    /* Left panel — webview */
+    #browser-panel { flex: 1; display: flex; flex-direction: column; background: #252526; }
+    #nav-bar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #333; }
+    #nav-bar button { background: #555; color: #ddd; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+    #nav-bar button:hover { background: #666; }
+    #url-bar { flex: 1; background: #1e1e1e; color: #d4d4d4; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; font-size: 13px; }
+    webview { flex: 1; }
+
+    /* Right panel — recorder */
+    #recorder-panel { width: 360px; min-width: 300px; display: flex; flex-direction: column; background: #1e1e1e; border-left: 1px solid #333; }
+    #recorder-header { padding: 12px 14px; background: #0078d4; color: #fff; font-size: 15px; font-weight: 600; text-align: center; }
+
+    /* Setup section */
+    .section { padding: 10px 14px; }
+    .section label { display: block; font-size: 12px; color: #aaa; margin-bottom: 3px; }
+    .section input, .section textarea { width: 100%; background: #2d2d2d; color: #ddd; border: 1px solid #444; border-radius: 4px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
+    .section textarea { resize: vertical; min-height: 50px; }
+
+    /* Buttons */
+    .btn { display: block; width: 100%; padding: 9px; border: none; border-radius: 5px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background .15s; }
+    .btn-primary { background: #0078d4; color: #fff; }
+    .btn-primary:hover { background: #106ebe; }
+    .btn-primary:disabled { background: #555; cursor: not-allowed; }
+    .btn-success { background: #16825d; color: #fff; }
+    .btn-success:hover { background: #1a9d6f; }
+    .btn-danger { background: #c33; color: #fff; }
+    .btn-danger:hover { background: #e04040; }
+
+    /* Step list */
+    #step-list-container { flex: 1; overflow-y: auto; padding: 8px 14px; }
+    #step-list-container h3 { font-size: 13px; color: #888; margin-bottom: 6px; }
+    .step-card { background: #2a2a2a; border: 1px solid #3a3a3a; border-radius: 5px; padding: 8px; margin-bottom: 8px; position: relative; }
+    .step-card .step-num { font-weight: 700; color: #0078d4; font-size: 13px; }
+    .step-card .step-desc { font-size: 12px; color: #bbb; margin-top: 3px; word-break: break-word; }
+    .step-card img { width: 100%; border-radius: 3px; margin-top: 5px; border: 1px solid #444; }
+    .step-card .step-delete { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #888; cursor: pointer; font-size: 14px; }
+    .step-card .step-delete:hover { color: #e04040; }
+
+    /* Status */
+    #status { padding: 6px 14px; font-size: 12px; color: #888; border-top: 1px solid #333; }
+    #status.error { color: #e04040; }
+    #status.success { color: #4ec9b0; }
+
+    /* Guide output */
+    #guide-output { display: none; flex: 1; overflow-y: auto; padding: 14px; }
+    #guide-output pre { white-space: pre-wrap; font-size: 12px; color: #d4d4d4; background: #1a1a1a; padding: 10px; border-radius: 4px; }
+
+    /* Panels visibility */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- LEFT: Browser panel -->
+<div id="browser-panel">
+  <div id="nav-bar">
+    <button id="btn-back" title="Back">&#8592;</button>
+    <button id="btn-forward" title="Forward">&#8594;</button>
+    <button id="btn-reload" title="Reload">&#8635;</button>
+    <input id="url-bar" type="text" placeholder="Enter URL and press Enter...">
+    <button id="btn-go" title="Go">Go</button>
+  </div>
+  <webview id="azure-webview" partition="persist:azure" src="about:blank"
+           style="width:100%;height:100%;" allowpopups
+           webpreferences="contextIsolation=no, allowRunningInsecureContent=no"></webview>
+</div>
+
+<!-- RIGHT: Recorder panel -->
+<div id="recorder-panel">
+  <div id="recorder-header">Lab Guide Recorder</div>
+
+  <!-- Setup form -->
+  <div id="setup-section" class="section">
+    <label for="lab-title">Lab Title</label>
+    <input id="lab-title" type="text" placeholder="e.g. Deploy a Virtual Machine">
+    <label for="lab-url" style="margin-top:8px;">Start URL</label>
+    <input id="lab-url" type="text" value="https://portal.azure.com" placeholder="https://portal.azure.com">
+    <label for="lab-desc" style="margin-top:8px;">Description (optional)</label>
+    <textarea id="lab-desc" rows="2" placeholder="Brief description of this lab..."></textarea>
+    <button id="btn-start" class="btn btn-primary" style="margin-top:12px;">Start Recording</button>
+  </div>
+
+  <!-- Recording controls -->
+  <div id="recording-section" class="section hidden">
+    <label for="step-desc">Step Description</label>
+    <textarea id="step-desc" rows="2" placeholder="Describe what you just did..."></textarea>
+    <button id="btn-capture" class="btn btn-primary">Capture Step</button>
+    <button id="btn-generate" class="btn btn-success" style="margin-top:6px;" disabled>Generate Guide</button>
+    <button id="btn-stop" class="btn btn-danger" style="margin-top:6px;">Stop &amp; Reset</button>
+  </div>
+
+  <!-- Step list -->
+  <div id="step-list-container">
+    <h3>Captured Steps (<span id="step-count">0</span>)</h3>
+    <div id="step-list"></div>
+  </div>
+
+  <!-- Guide output (shown after generation) -->
+  <div id="guide-output">
+    <h3 style="color:#4ec9b0;margin-bottom:8px;">Generated Guide</h3>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+      <button id="btn-save-md" class="btn btn-primary" style="flex:1;min-width:100px;margin-top:0;">Save .md</button>
+      <button id="btn-open-folder" class="btn btn-success" style="flex:1;min-width:100px;margin-top:0;">Open Folder</button>
+      <button id="btn-export" class="btn btn-success" style="flex:1;min-width:100px;margin-top:0;">Export All</button>
+    </div>
+    <pre id="guide-text"></pre>
+    <button id="btn-back-to-recording" class="btn btn-primary" style="margin-top:10px;">Back to Recording</button>
+  </div>
+
+  <div id="status">Ready</div>
+</div>
+
+<script>
+(function () {
+  // ── Elements ──
+  const webview      = document.getElementById('azure-webview');
+  const urlBar       = document.getElementById('url-bar');
+  const btnBack      = document.getElementById('btn-back');
+  const btnForward   = document.getElementById('btn-forward');
+  const btnReload    = document.getElementById('btn-reload');
+
+  const setupSection     = document.getElementById('setup-section');
+  const recordingSection = document.getElementById('recording-section');
+  const stepListContainer = document.getElementById('step-list-container');
+  const guideOutput      = document.getElementById('guide-output');
+
+  const labTitle   = document.getElementById('lab-title');
+  const labUrl     = document.getElementById('lab-url');
+  const labDesc    = document.getElementById('lab-desc');
+  const btnStart   = document.getElementById('btn-start');
+
+  const stepDesc   = document.getElementById('step-desc');
+  const btnCapture = document.getElementById('btn-capture');
+  const btnGenerate = document.getElementById('btn-generate');
+  const btnStop    = document.getElementById('btn-stop');
+  const stepCount  = document.getElementById('step-count');
+  const stepList   = document.getElementById('step-list');
+  const statusEl   = document.getElementById('status');
+  const guideText  = document.getElementById('guide-text');
+  const btnBackToRecording = document.getElementById('btn-back-to-recording');
+  const btnSaveMd    = document.getElementById('btn-save-md');
+  const btnOpenFolder = document.getElementById('btn-open-folder');
+  const btnExport    = document.getElementById('btn-export');
+
+  let serverPort = 9005;
+  let recording  = false;
+  let steps      = [];
+  let capturing  = false;
+  let lastGuideData = null; // { markdown, markdownPath, guideDir }
+
+  // ── Helpers ──
+  function setStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = type || '';
+  }
+
+  function apiUrl(path) {
+    return `http://localhost:${serverPort}${path}`;
+  }
+
+  // ── Navigation ──
+  function navigateToUrl() {
+    const url = urlBar.value.trim();
+    if (!url) return;
+    // Add https:// if no protocol
+    const fullUrl = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+    urlBar.value = fullUrl;
+    webview.loadURL(fullUrl);
+  }
+
+  btnBack.addEventListener('click', () => { webview.goBack(); });
+  btnForward.addEventListener('click', () => { webview.goForward(); });
+  btnReload.addEventListener('click', () => webview.reload());
+  document.getElementById('btn-go').addEventListener('click', navigateToUrl);
+  urlBar.addEventListener('keydown', (e) => { if (e.key === 'Enter') navigateToUrl(); });
+
+  webview.addEventListener('did-navigate', (e) => { urlBar.value = e.url; });
+  webview.addEventListener('did-navigate-in-page', (e) => { urlBar.value = e.url; });
+
+  // Handle webview crash — show message, auto-reload
+  webview.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode !== -3) { // -3 is aborted (user navigated away), ignore it
+      setStatus(`Page load failed: ${e.errorDescription || 'unknown error'}`, 'error');
+    }
+  });
+  webview.addEventListener('render-process-gone', (e) => {
+    setStatus('Browser crashed — reloading...', 'error');
+    setTimeout(() => {
+      try { webview.reload(); } catch { /* ignore */ }
+    }, 1500);
+  });
+
+  // Inject click tracker when a page loads in the webview
+  webview.addEventListener('did-finish-load', async () => {
+    urlBar.value = webview.getURL();
+    if (recording) {
+      await window.electronAPI.injectClickTracker();
+    }
+  });
+  // Also inject on in-page navigation (SPA)
+  webview.addEventListener('did-navigate-in-page', async () => {
+    if (recording) {
+      await window.electronAPI.injectClickTracker();
+    }
+  });
+
+  // ── Init: get server port ──
+  async function init() {
+    try {
+      serverPort = await window.electronAPI.getPort();
+    } catch { /* use default */ }
+  }
+  init();
+
+  // ── Start Recording ──
+  btnStart.addEventListener('click', async () => {
+    const title = labTitle.value.trim();
+    const url   = labUrl.value.trim();
+    if (!title) { setStatus('Please enter a lab title.', 'error'); return; }
+    if (!url)   { setStatus('Please enter a start URL.', 'error'); return; }
+
+    btnStart.disabled = true;
+    setStatus('Starting session...');
+
+    try {
+      // Call server to initialize session state
+      const resp = await fetch(apiUrl('/api/session/start'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, url, description: labDesc.value.trim() }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to start session');
+
+      // Navigate webview
+      webview.src = url;
+      recording = true;
+      steps = [];
+
+      // UI switch
+      setupSection.classList.add('hidden');
+      recordingSection.classList.remove('hidden');
+      stepList.innerHTML = '';
+      stepCount.textContent = '0';
+      btnGenerate.disabled = true;
+      setStatus('Recording — perform actions and capture steps.', 'success');
+
+      // Inject click tracker once webview loads (handled in did-finish-load)
+    } catch (err) {
+      setStatus('Error: ' + err.message, 'error');
+    } finally {
+      btnStart.disabled = false;
+    }
+  });
+
+  // ── Capture Step ──
+  btnCapture.addEventListener('click', async () => {
+    if (capturing) return;
+    capturing = true;
+    btnCapture.disabled = true;
+    setStatus('Capturing screenshot...');
+
+    try {
+      // 1) Get click data (last-clicked element bounding box)
+      const clickBox = await window.electronAPI.getClickData();
+
+      // 2) Capture webview screenshot
+      const base64 = await window.electronAPI.captureScreenshot();
+      if (!base64) throw new Error('Screenshot capture returned empty');
+
+      // 3) Get device pixel ratio for coordinate scaling
+      const dpr = await window.electronAPI.getDevicePixelRatio();
+
+      // 4) Get webview page info
+      const pageInfo = await window.electronAPI.getWebviewInfo();
+
+      // 5) Send to server for processing (annotation + save)
+      const desc = stepDesc.value.trim() || `Step ${steps.length + 1}`;
+      const resp = await fetch(apiUrl('/api/desktop/capture'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          screenshot: base64,
+          description: desc,
+          clickBox: clickBox || null,
+          pageUrl: pageInfo.url,
+          pageTitle: pageInfo.title,
+          dpr,
+        }),
+      });
+
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Capture failed');
+      const step = await resp.json();
+      steps.push(step);
+
+      // Render step
+      renderStep(step);
+      stepCount.textContent = String(steps.length);
+      stepDesc.value = '';
+      btnGenerate.disabled = false;
+      setStatus(`Step ${step.stepNumber} captured!`, 'success');
+    } catch (err) {
+      setStatus('Capture error: ' + err.message, 'error');
+    } finally {
+      capturing = false;
+      btnCapture.disabled = false;
+    }
+  });
+
+  // ── Render a step card ──
+  function renderStep(step) {
+    const card = document.createElement('div');
+    card.className = 'step-card';
+    card.dataset.num = step.stepNumber;
+    card.innerHTML = `
+      <span class="step-num">Step ${step.stepNumber}</span>
+      <button class="step-delete" title="Delete step">&times;</button>
+      <div class="step-desc">${escapeHtml(step.description)}</div>
+      <img src="${apiUrl('/' + step.screenshotRelative)}" alt="Step ${step.stepNumber}">
+    `;
+    card.querySelector('.step-delete').addEventListener('click', () => deleteStep(step.stepNumber, card));
+    stepList.appendChild(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Delete step ──
+  async function deleteStep(num, card) {
+    try {
+      const resp = await fetch(apiUrl(`/api/session/step/${num}`), { method: 'DELETE' });
+      if (resp.ok) {
+        card.remove();
+        steps = steps.filter(s => s.stepNumber !== num);
+        stepCount.textContent = String(steps.length);
+        if (steps.length === 0) btnGenerate.disabled = true;
+        setStatus(`Step ${num} deleted.`);
+      }
+    } catch (err) {
+      setStatus('Delete error: ' + err.message, 'error');
+    }
+  }
+
+  // ── Generate Guide ──
+  btnGenerate.addEventListener('click', async () => {
+    btnGenerate.disabled = true;
+    setStatus('Generating guide with AI — this may take a moment...');
+
+    try {
+      const resp = await fetch(apiUrl('/api/session/generate'), { method: 'POST' });
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Generation failed');
+      const data = await resp.json();
+
+      lastGuideData = data;
+      guideText.textContent = data.guide || data.markdown || JSON.stringify(data, null, 2);
+      recordingSection.classList.add('hidden');
+      stepListContainer.classList.add('hidden');
+      guideOutput.style.display = 'flex';
+      setStatus('Guide generated successfully!', 'success');
+    } catch (err) {
+      setStatus('Generation error: ' + err.message, 'error');
+      btnGenerate.disabled = false;
+    }
+  });
+
+  // ── Save / Open / Export ──
+  btnSaveMd.addEventListener('click', async () => {
+    if (!lastGuideData) return;
+    const md = lastGuideData.guide || lastGuideData.markdown;
+    const saved = await window.electronAPI.saveGuide({ markdown: md, defaultName: 'guide.md' });
+    if (saved) setStatus('Guide saved to: ' + saved, 'success');
+  });
+
+  btnOpenFolder.addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder info available.', 'error'); return; }
+    await window.electronAPI.openFolder(lastGuideData.guideDir);
+  });
+
+  btnExport.addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder info available.', 'error'); return; }
+    const dest = await window.electronAPI.exportGuideFolder({ guideDir: lastGuideData.guideDir });
+    if (dest) setStatus('Exported to: ' + dest, 'success');
+  });
+
+  // ── Back to recording ──
+  btnBackToRecording.addEventListener('click', () => {
+    guideOutput.style.display = 'none';
+    recordingSection.classList.remove('hidden');
+    stepListContainer.classList.remove('hidden');
+    btnGenerate.disabled = steps.length === 0;
+    setStatus('Recording — perform actions and capture steps.', 'success');
+  });
+
+  // ── Stop & Reset ──
+  btnStop.addEventListener('click', async () => {
+    if (!confirm('Stop recording and discard all steps?')) return;
+    try {
+      await fetch(apiUrl('/api/session/cancel'), { method: 'POST' });
+    } catch { /* ignore */ }
+    recording = false;
+    steps = [];
+    stepList.innerHTML = '';
+    stepCount.textContent = '0';
+    recordingSection.classList.add('hidden');
+    guideOutput.style.display = 'none';
+    setupSection.classList.remove('hidden');
+    webview.src = 'about:blank';
+    setStatus('Ready');
+  });
+
+  // ── Util ──
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+})();
+</script>
+</body>
+</html>

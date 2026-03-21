@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lab Recorder</title>
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --bg-card: #111827;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #22d3ee;
+      --red: #ef4444;
+      --green: #22c55e;
+      --orange: #f59e0b;
+      --font: 'Segoe UI', system-ui, sans-serif;
+      --mono: 'Cascadia Code', 'Fira Code', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font); background: var(--bg); color: var(--text);
+      font-size: 13px; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: linear-gradient(135deg, #0f172a, #1e1b4b);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 8px; }
+    .rec-dot {
+      width: 10px; height: 10px; border-radius: 50%; background: var(--red);
+      animation: pulse 1.5s infinite;
+    }
+    .rec-dot.done { background: var(--green); animation: none; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    .header-title {
+      font-size: 14px; font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), #818cf8);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .step-badge {
+      background: rgba(34,211,238,0.2); color: var(--accent);
+      padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    }
+
+    .content { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .content::-webkit-scrollbar { width: 4px; }
+    .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .section {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    }
+
+    textarea {
+      width: 100%; height: 56px; padding: 8px 10px; background: #0f1729;
+      border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+      font-family: var(--font); font-size: 13px; resize: vertical; outline: none;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-muted); }
+
+    .btn {
+      padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+      font-weight: 700; font-size: 13px; transition: all 0.2s; width: 100%; text-align: center;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover:not(:disabled) { background: #06b6d4; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: #1e293b; color: var(--text); }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    .status {
+      font-size: 12px; text-align: center; min-height: 18px; padding: 4px;
+      transition: color 0.3s; color: var(--text-muted);
+    }
+    .status.success { color: var(--green); }
+    .status.error { color: var(--red); }
+    .status.warning { color: var(--orange); }
+
+    .steps-header {
+      padding: 8px 0; font-size: 12px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+    }
+    .steps-list { max-height: 420px; overflow-y: auto; }
+    .steps-list::-webkit-scrollbar { width: 4px; }
+    .steps-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .empty-state { text-align: center; color: var(--text-muted); padding: 20px 8px; font-size: 12px; }
+
+    .step-item {
+      display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+      border-bottom: 1px solid var(--border); transition: background 0.15s;
+    }
+    .step-item:hover { background: rgba(255,255,255,0.03); }
+    .step-item:last-child { border-bottom: none; }
+    .step-num {
+      width: 24px; height: 24px; border-radius: 50%; background: rgba(34,211,238,0.15);
+      color: var(--accent); display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 11px; flex-shrink: 0;
+    }
+    .step-info { flex: 1; min-width: 0; }
+    .step-desc {
+      font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .step-meta {
+      font-size: 10px; color: var(--text-muted); margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .step-thumb {
+      width: 44px; height: 28px; border-radius: 3px; object-fit: cover;
+      border: 1px solid var(--border); flex-shrink: 0; cursor: pointer;
+    }
+    .step-actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .step-actions button {
+      background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+      padding: 3px; border-radius: 3px; font-size: 11px;
+    }
+    .step-actions button:hover { background: #1e293b; color: var(--text); }
+
+    .actions-section { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; padding: 12px; }
+
+    kbd {
+      background: #1e293b; padding: 2px 5px; border-radius: 3px;
+      font-size: 10px; font-family: var(--mono); border: 1px solid #334155;
+    }
+    .shortcut { text-align: center; font-size: 11px; color: var(--text-muted); padding: 2px; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px; width: 90%; max-width: 320px;
+    }
+    .modal h3 { font-size: 13px; margin-bottom: 8px; }
+    .modal input {
+      width: 100%; padding: 7px 10px; background: #0f1729; border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-family: var(--font); font-size: 13px;
+      outline: none; margin-bottom: 8px;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-btns .btn { width: auto; padding: 6px 12px; font-size: 12px; }
+
+    .img-preview {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+      z-index: 200; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .img-preview.active { display: flex; }
+    .img-preview img { max-width: 95%; max-height: 95%; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <div class="rec-dot" id="recDot"></div>
+      <span class="header-title">Lab Recorder</span>
+    </div>
+    <span class="step-badge" id="stepBadge">0 steps</span>
+  </div>
+
+  <div class="content">
+    <!-- Capture -->
+    <div class="section">
+      <textarea id="stepDesc" placeholder="What did you just do? (e.g., Clicked 'Create a resource')"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="captureBtn">📸 Capture Step</button>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <!-- Steps -->
+    <div class="section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="steps-header">Captured Steps</div>
+      <div class="steps-list" id="stepsList">
+        <div class="empty-state">No steps yet.<br>Perform actions, then capture.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions-section">
+    <button class="btn btn-success" id="generateBtn">✓ Generate Guide</button>
+    <button class="btn btn-ghost" id="cancelBtn">Cancel Session</button>
+    <div class="shortcut">Press <kbd>Ctrl+Shift+C</kbd> to capture</div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>Edit Step</h3>
+      <input id="editInput" placeholder="Step description">
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="editCancel">Cancel</button>
+        <button class="btn btn-primary" id="editSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Preview -->
+  <div class="img-preview" id="imgPreview" onclick="this.classList.remove('active')">
+    <img id="imgPreviewSrc" src="">
+  </div>
+
+  <script>
+    const API = window.location.origin + '/api';
+    let stepCount = 0;
+    let editingStepNum = null;
+    let pollInterval = null;
+
+    const $ = (s) => document.getElementById(s);
+
+    // ── Capture ──
+    $('captureBtn').addEventListener('click', async () => {
+      const desc = $('stepDesc').value.trim();
+      $('captureBtn').disabled = true;
+      $('captureBtn').textContent = '⏳ Capturing...';
+      setStatus('');
+      try {
+        const step = await apiCall('/session/capture', {
+          method: 'POST', body: { description: desc || undefined },
+        });
+        if (step.error) { setStatus('Error: ' + step.error, 'error'); }
+        else {
+          stepCount = step.stepNumber;
+          updateBadge();
+          setStatus('Step ' + step.stepNumber + ' captured!', 'success');
+          $('stepDesc').value = '';
+          refreshSteps();
+        }
+      } catch (err) { setStatus('Failed: ' + err.message, 'error'); }
+      finally {
+        $('captureBtn').disabled = false;
+        $('captureBtn').textContent = '📸 Capture Step';
+      }
+    });
+
+    // ── Generate ──
+    $('generateBtn').addEventListener('click', async () => {
+      if (stepCount === 0) { setStatus('Capture at least one step!', 'warning'); return; }
+      if (!confirm('Stop recording and generate the lab guide?')) return;
+      $('generateBtn').disabled = true;
+      $('generateBtn').textContent = '⏳ Generating...';
+      setStatus('Generating guide with AI...', 'warning');
+      try {
+        const data = await apiCall('/session/generate', { method: 'POST', body: {} });
+        if (data.error) {
+          setStatus('Error: ' + data.error, 'error');
+          $('generateBtn').disabled = false;
+          $('generateBtn').textContent = '✓ Generate Guide';
+        } else {
+          setStatus('Guide generated! (' + data.stepsCount + ' steps) Check the web UI.', 'success');
+          $('generateBtn').textContent = '✓ Done!';
+          $('recDot').classList.add('done');
+          stopPolling();
+        }
+      } catch (err) {
+        setStatus('Failed: ' + err.message, 'error');
+        $('generateBtn').disabled = false;
+        $('generateBtn').textContent = '✓ Generate Guide';
+      }
+    });
+
+    // ── Cancel ──
+    $('cancelBtn').addEventListener('click', async () => {
+      if (!confirm('Cancel recording? Steps will be lost.')) return;
+      await apiCall('/session/cancel', { method: 'POST' });
+      setStatus('Session cancelled.', 'warning');
+      stepCount = 0; updateBadge();
+      renderSteps([]);
+      $('recDot').classList.add('done');
+      stopPolling();
+    });
+
+    // ── Edit Modal ──
+    function openEdit(num, desc) {
+      editingStepNum = num;
+      $('editInput').value = desc;
+      $('editModal').classList.add('active');
+      $('editInput').focus();
+    }
+    $('editCancel').addEventListener('click', () => { $('editModal').classList.remove('active'); });
+    $('editSave').addEventListener('click', async () => {
+      if (editingStepNum == null) return;
+      const d = $('editInput').value.trim();
+      if (!d) return;
+      await apiCall('/session/step/' + editingStepNum, { method: 'PUT', body: { description: d } });
+      $('editModal').classList.remove('active');
+      editingStepNum = null;
+      refreshSteps();
+    });
+    $('editInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('editSave').click();
+      if (e.key === 'Escape') $('editCancel').click();
+    });
+
+    // ── Rendering ──
+    async function refreshSteps() {
+      try {
+        const data = await apiCall('/session');
+        if (data.steps) { renderSteps(data.steps); stepCount = data.stepCount || data.steps.length; updateBadge(); }
+      } catch {}
+    }
+
+    function renderSteps(steps) {
+      const el = $('stepsList');
+      if (!steps || !steps.length) {
+        el.innerHTML = '<div class="empty-state">No steps yet.<br>Perform actions, then capture.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      steps.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'step-item';
+        const thumbUrl = s.screenshotFilename ? (window.location.origin + '/screenshots/' + s.screenshotFilename) : '';
+        div.innerHTML =
+          '<div class="step-num">' + s.stepNumber + '</div>' +
+          '<div class="step-info">' +
+            '<div class="step-desc" title="' + esc(s.description) + '">' + esc(s.description) + '</div>' +
+            '<div class="step-meta">' + esc(s.pageTitle || '') + ' · ' + new Date(s.timestamp).toLocaleTimeString() + '</div>' +
+          '</div>' +
+          (thumbUrl ? '<img class="step-thumb" src="' + thumbUrl + '" data-full="' + thumbUrl + '" alt="Step ' + s.stepNumber + '">' : '') +
+          '<div class="step-actions">' +
+            '<button title="Edit" data-edit="' + s.stepNumber + '" data-desc="' + esc(s.description) + '">✎</button>' +
+            '<button title="Delete" data-del="' + s.stepNumber + '">✕</button>' +
+          '</div>';
+        el.appendChild(div);
+      });
+
+      el.querySelectorAll('[data-edit]').forEach(b =>
+        b.addEventListener('click', () => openEdit(+b.dataset.edit, b.dataset.desc))
+      );
+      el.querySelectorAll('[data-del]').forEach(b =>
+        b.addEventListener('click', async () => {
+          await apiCall('/session/step/' + b.dataset.del, { method: 'DELETE' });
+          refreshSteps();
+        })
+      );
+      el.querySelectorAll('.step-thumb').forEach(img =>
+        img.addEventListener('click', () => { $('imgPreviewSrc').src = img.dataset.full; $('imgPreview').classList.add('active'); })
+      );
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // ── Polling ──
+    function startPolling() {
+      if (pollInterval) return;
+      pollInterval = setInterval(async () => {
+        try {
+          const data = await apiCall('/session');
+          if (!data.active) return;
+          const n = data.stepCount || (data.steps ? data.steps.length : 0);
+          if (n !== stepCount) { stepCount = n; updateBadge(); renderSteps(data.steps || []); }
+        } catch {}
+      }, 2000);
+    }
+    function stopPolling() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } }
+
+    // ── Keyboard shortcut ──
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); $('captureBtn').click(); }
+    });
+
+    // ── Enter to capture ──
+    $('stepDesc').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('captureBtn').click(); }
+    });
+
+    // ── Helpers ──
+    async function apiCall(path, opts = {}) {
+      const r = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      return r.json();
+    }
+    function updateBadge() { $('stepBadge').textContent = stepCount + ' step' + (stepCount !== 1 ? 's' : ''); }
+    function setStatus(t, cls) { $('status').textContent = t; $('status').className = 'status' + (cls ? ' ' + cls : ''); }
+    function esc(t) { const d = document.createElement('span'); d.textContent = t || ''; return d.innerHTML; }
+
+    // ── Boot ──
+    (async () => {
+      try {
+        const data = await apiCall('/session');
+        if (data.active) {
+          stepCount = data.stepCount || 0;
+          updateBadge();
+          renderSteps(data.steps || []);
+        }
+      } catch {}
+      startPolling();
+    })();
+  </script>
+</body>
+</html>

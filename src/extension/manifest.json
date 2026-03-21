@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Lab Guide Recorder",
+  "version": "1.0.0",
+  "description": "Record Azure lab guide steps from a browser side panel",
+  "permissions": [
+    "sidePanel",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:*/*"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Lab Recorder"
+  },
+  "commands": {
+    "capture-step": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C"
+      },
+      "description": "Capture current step"
+    }
+  }
+}

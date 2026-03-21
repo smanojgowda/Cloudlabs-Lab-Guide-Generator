@@ -1,0 +1,32 @@
+{
+  "name": "lab-guide-agent",
+  "version": "3.0.0",
+  "description": "AI-powered browser agent that generates Azure lab guides with real screenshots using Playwright",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "record": "node src/index.js record",
+    "serve": "node src/index.js serve",
+    "dev": "node --watch src/server.js",
+    "desktop": "electron desktop.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.85.0",
+    "playwright": "^1.52.0",
+    "sharp": "^0.33.5",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1"
+  }
+}

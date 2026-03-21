@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Screenshot</title>
+  <style>
+    :root {
+      --spektra: #7c3aed; --spektra-hover: #6d28d9;
+      --bg-dark: #0d1117; --bg-panel: #161b22; --bg-elevated: #21262d;
+      --border: #30363d; --text-primary: #e6edf3; --text-secondary: #8b949e;
+      --danger: #f85149; --radius: 8px; --radius-sm: 5px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg-dark); color: var(--text-primary); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    #toolbar { display: flex; gap: 8px; padding: 10px 16px; background: var(--bg-panel); border-bottom: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+    #toolbar button { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; }
+    #toolbar button:hover { background: var(--border); }
+    #toolbar button.active { background: var(--spektra); color: #fff; border-color: var(--spektra); }
+    #toolbar .sep { width: 1px; height: 24px; background: var(--border); }
+    #toolbar label { font-size: 12px; color: var(--text-secondary); }
+    #toolbar input[type="color"], #toolbar input[type="number"] { background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 12px; }
+    .btn-save { background: var(--spektra) !important; color: #fff !important; border-color: var(--spektra) !important; }
+    .btn-save:hover { background: var(--spektra-hover) !important; }
+    .btn-cancel { background: transparent !important; color: var(--danger) !important; border-color: var(--danger) !important; }
+    .btn-cancel:hover { background: var(--danger) !important; color: #fff !important; }
+    #canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
+    #editor-canvas { cursor: crosshair; border: 2px solid var(--border); border-radius: var(--radius-sm); background: #000; }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="tool-rect" class="active" title="Draw box">&#9645; Box</button>
+    <button id="tool-crop" title="Crop">&#9986; Crop</button>
+    <div class="sep"></div>
+    <label>Color:</label><input type="color" id="ed-color" value="#ff0000">
+    <label>Width:</label><input type="number" id="ed-stroke" value="4" min="1" max="16" style="width:50px;">
+    <div class="sep"></div>
+    <button id="btn-undo">&#8630; Undo</button>
+    <button id="btn-clear">&#128465; Clear</button>
+    <div class="sep"></div>
+    <button id="btn-save" class="btn-save">&#10004; Save</button>
+    <button id="btn-cancel" class="btn-cancel">&#10006; Cancel</button>
+  </div>
+  <div id="canvas-area">
+    <canvas id="editor-canvas"></canvas>
+  </div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('editor-canvas');
+  const ctx = canvas.getContext('2d');
+  let img = null, tool = 'rect', drawings = [], cropRegion = null, dragStart = null, isDragging = false;
+
+  // Receive image data from main process
+  window.editorAPI.onImageData((data) => {
+    document.title = 'Edit — Step ' + data.stepNumber;
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      const area = document.getElementById('canvas-area');
+      const maxW = area.clientWidth - 24, maxH = area.clientHeight - 24;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (h > maxH) { w = w * maxH / h; h = maxH; }
+      canvas.width = Math.round(w); canvas.height = Math.round(h);
+      redraw();
+    };
+    image.src = 'data:image/png;base64,' + data.base64;
+  });
+
+  function redraw() {
+    if (!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const d of drawings) {
+      ctx.strokeStyle = d.color; ctx.lineWidth = d.stroke; ctx.lineJoin = 'round';
+      ctx.strokeRect(d.x, d.y, d.w, d.h);
+    }
+    if (cropRegion && tool === 'crop') {
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(0, 0, canvas.width, cropRegion.y);
+      ctx.fillRect(0, cropRegion.y + cropRegion.h, canvas.width, canvas.height - cropRegion.y - cropRegion.h);
+      ctx.fillRect(0, cropRegion.y, cropRegion.x, cropRegion.h);
+      ctx.fillRect(cropRegion.x + cropRegion.w, cropRegion.y, canvas.width - cropRegion.x - cropRegion.w, cropRegion.h);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      ctx.strokeRect(cropRegion.x, cropRegion.y, cropRegion.w, cropRegion.h); ctx.setLineDash([]);
+    }
+  }
+
+  function updateToolUI() {
+    document.getElementById('tool-rect').classList.toggle('active', tool === 'rect');
+    document.getElementById('tool-crop').classList.toggle('active', tool === 'crop');
+  }
+
+  document.getElementById('tool-rect').addEventListener('click', () => { tool = 'rect'; cropRegion = null; updateToolUI(); redraw(); });
+  document.getElementById('tool-crop').addEventListener('click', () => { tool = 'crop'; updateToolUI(); redraw(); });
+
+  canvas.addEventListener('mousedown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    dragStart = { x: e.clientX - r.left, y: e.clientY - r.top };
+    isDragging = true;
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging || !dragStart) return;
+    const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const rx = Math.min(dragStart.x, mx), ry = Math.min(dragStart.y, my);
+    const rw = Math.abs(mx - dragStart.x), rh = Math.abs(my - dragStart.y);
+    redraw();
+    if (tool === 'rect') {
+      ctx.strokeStyle = document.getElementById('ed-color').value;
+      ctx.lineWidth = parseInt(document.getElementById('ed-stroke').value) || 4;
+      ctx.strokeRect(rx, ry, rw, rh);
+    } else if (tool === 'crop') {
+      cropRegion = { x: rx, y: ry, w: rw, h: rh }; redraw();
+    }
+  });
+  canvas.addEventListener('mouseup', (e) => {
+    if (!isDragging || !dragStart) return;
+    const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const rx = Math.min(dragStart.x, mx), ry = Math.min(dragStart.y, my);
+    const rw = Math.abs(mx - dragStart.x), rh = Math.abs(my - dragStart.y);
+    if (rw > 5 && rh > 5) {
+      if (tool === 'rect') drawings.push({ x: rx, y: ry, w: rw, h: rh, color: document.getElementById('ed-color').value, stroke: parseInt(document.getElementById('ed-stroke').value) || 4 });
+      else if (tool === 'crop') cropRegion = { x: rx, y: ry, w: rw, h: rh };
+    }
+    isDragging = false; dragStart = null; redraw();
+  });
+
+  document.getElementById('btn-undo').addEventListener('click', () => { if (tool === 'crop') cropRegion = null; else drawings.pop(); redraw(); });
+  document.getElementById('btn-clear').addEventListener('click', () => { drawings = []; cropRegion = null; redraw(); });
+  document.getElementById('btn-cancel').addEventListener('click', () => window.close());
+
+  document.getElementById('btn-save').addEventListener('click', () => {
+    if (!img) return;
+    const full = document.createElement('canvas');
+    const scX = img.width / canvas.width, scY = img.height / canvas.height;
+    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+    if (cropRegion) { sx = Math.round(cropRegion.x * scX); sy = Math.round(cropRegion.y * scY); sw = Math.round(cropRegion.w * scX); sh = Math.round(cropRegion.h * scY); }
+    full.width = sw; full.height = sh;
+    const fc = full.getContext('2d');
+    fc.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    for (const d of drawings) {
+      fc.strokeStyle = d.color; fc.lineWidth = d.stroke * Math.max(scX, scY); fc.lineJoin = 'round';
+      fc.strokeRect(d.x * scX - sx, d.y * scY - sy, d.w * scX, d.h * scY);
+    }
+    const b64 = full.toDataURL('image/png').split(',')[1];
+    window.editorAPI.save(b64);
+  });
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.close();
+    if (e.ctrlKey && e.key === 'z') { if (tool === 'crop') cropRegion = null; else drawings.pop(); redraw(); }
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); document.getElementById('btn-save').click(); }
+  });
+})();
+</script>
+</body>
+</html>

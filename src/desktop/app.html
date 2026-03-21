@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' 'unsafe-inline' http://localhost:*; img-src 'self' http://localhost:* data: blob:; script-src 'self' 'unsafe-inline';">
+  <title>Spektra Lab Guide Studio</title>
+  <style>
+    :root {
+      --spektra: #7c3aed;
+      --spektra-hover: #6d28d9;
+      --spektra-dark: #5b21b6;
+      --spektra-accent: #a78bfa;
+      --bg-dark: #0d1117;
+      --bg-panel: #161b22;
+      --bg-card: #1c2128;
+      --bg-input: #0d1117;
+      --bg-elevated: #21262d;
+      --border: #30363d;
+      --border-light: #3d444d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --danger: #f85149;
+      --danger-hover: #da3633;
+      --warning: #d29922;
+      --info: #58a6ff;
+      --radius: 8px;
+      --radius-sm: 5px;
+      --shadow: 0 2px 12px rgba(0,0,0,.4);
+      --transition: .2s ease;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { display: flex; height: 100vh; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-dark); color: var(--text-primary); overflow: hidden; }
+
+    /* LEFT: Browser Panel */
+    #browser-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg-panel); }
+    #tab-bar { display: flex; align-items: center; background: var(--bg-dark); border-bottom: 1px solid var(--border); height: 38px; padding: 0 4px; gap: 2px; }
+    .tab { display: flex; align-items: center; gap: 6px; padding: 6px 14px; background: transparent; color: var(--text-secondary); border: none; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 12px; max-width: 200px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: var(--transition); }
+    .tab:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .tab.active { background: var(--bg-panel); color: var(--text-primary); border-bottom: 2px solid var(--spektra); }
+    .tab .tab-close { display: none; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 0 2px; margin-left: 4px; border-radius: 3px; }
+    .tab:hover .tab-close, .tab.active .tab-close { display: inline; }
+    .tab .tab-close:hover { background: var(--danger); color: #fff; }
+    #btn-new-tab { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px 10px; border-radius: 4px; }
+    #btn-new-tab:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    #nav-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--bg-dark); border-bottom: 1px solid var(--border); }
+    .nav-btn { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; cursor: pointer; font-size: 14px; transition: var(--transition); display: flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; }
+    .nav-btn:hover { background: var(--border); color: var(--text-primary); }
+    #url-bar { flex: 1; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: 20px; padding: 6px 16px; font-size: 13px; outline: none; transition: border-color var(--transition); }
+    #url-bar:focus { border-color: var(--spektra); box-shadow: 0 0 0 2px rgba(124,58,237,.25); }
+    .nav-btn-go { background: var(--spektra); color: #fff; border-color: var(--spektra); font-weight: 600; padding: 5px 14px; border-radius: 20px; }
+    .nav-btn-go:hover { background: var(--spektra-hover); }
+    #webview-container { flex: 1; position: relative; }
+    #webview-container webview { width: 100%; height: 100%; }
+
+    /* RIGHT: Recorder Panel */
+    #recorder-panel { width: 380px; min-width: 340px; display: flex; flex-direction: column; background: var(--bg-panel); border-left: 1px solid var(--border); }
+    #recorder-header { padding: 14px 18px; background: linear-gradient(135deg, var(--spektra-dark) 0%, var(--spektra) 100%); display: flex; align-items: center; gap: 12px; }
+    #recorder-header .logo-icon { font-size: 26px; }
+    #recorder-header .brand { display: flex; flex-direction: column; }
+    #recorder-header .brand-name { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: .5px; }
+    #recorder-header .brand-sub { font-size: 10px; color: rgba(255,255,255,.75); letter-spacing: 1px; text-transform: uppercase; }
+    #panel-tabs { display: flex; background: var(--bg-dark); border-bottom: 1px solid var(--border); }
+    .panel-tab { flex: 1; padding: 10px 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; transition: var(--transition); text-transform: uppercase; letter-spacing: .5px; }
+    .panel-tab:hover { color: var(--text-primary); background: var(--bg-elevated); }
+    .panel-tab.active { color: var(--spektra); border-bottom-color: var(--spektra); }
+    .panel-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .panel-content.active { display: flex; }
+    .section { padding: 12px 16px; }
+    .section label { display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+    .section input, .section textarea, .section select { width: 100%; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; transition: border-color var(--transition); }
+    .section input:focus, .section textarea:focus { border-color: var(--spektra); box-shadow: 0 0 0 2px rgba(124,58,237,.2); }
+    .section textarea { resize: vertical; min-height: 50px; }
+    .btn { display: block; width: 100%; padding: 10px; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: all var(--transition); letter-spacing: .3px; }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--spektra); color: #fff; }
+    .btn-primary:hover { background: var(--spektra-hover); box-shadow: 0 4px 12px rgba(124,58,237,.35); }
+    .btn-primary:disabled { background: var(--bg-elevated); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+    .btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; display: inline-block; width: auto; }
+    .btn-icon { display: inline-flex; align-items: center; gap: 6px; }
+    #step-list-container { flex: 1; overflow-y: auto; padding: 8px 16px; }
+    #step-list-container::-webkit-scrollbar { width: 6px; }
+    #step-list-container::-webkit-scrollbar-track { background: transparent; }
+    #step-list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .steps-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .steps-header h3 { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .step-badge { background: var(--spektra); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .step-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; position: relative; transition: border-color var(--transition); }
+    .step-card:hover { border-color: var(--spektra); }
+    .step-card .step-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .step-card .step-num { font-weight: 700; color: var(--spektra); font-size: 13px; }
+    .step-card .step-actions { display: flex; gap: 4px; }
+    .step-card .step-action-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: var(--transition); }
+    .step-card .step-action-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .step-card .step-action-btn.danger:hover { color: var(--danger); }
+    .step-card .step-desc { font-size: 12px; color: var(--text-secondary); word-break: break-word; line-height: 1.4; }
+    .step-card .step-thumb { width: 100%; border-radius: var(--radius-sm); margin-top: 8px; border: 1px solid var(--border); cursor: pointer; transition: var(--transition); }
+    .step-card .step-thumb:hover { border-color: var(--spektra); opacity: .9; }
+    #status-bar { padding: 8px 16px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--bg-dark); }
+    #status-bar .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    #status-bar.error .status-dot { background: var(--danger); }
+    #status-bar.success .status-dot { background: var(--spektra); }
+    #status-bar.warning .status-dot { background: var(--warning); }
+    #preview-content { padding: 16px; overflow-y: auto; }
+    #preview-content::-webkit-scrollbar { width: 6px; }
+    #preview-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .md-preview { font-size: 13px; line-height: 1.7; color: var(--text-primary); }
+    .md-preview h1 { font-size: 20px; font-weight: 700; margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--spektra); }
+    .md-preview h2 { font-size: 17px; font-weight: 600; margin: 14px 0 6px; color: var(--spektra-accent); }
+    .md-preview h3 { font-size: 15px; font-weight: 600; margin: 12px 0 4px; }
+    .md-preview h4 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: var(--text-secondary); }
+    .md-preview p { margin: 6px 0; }
+    .md-preview img { max-width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 8px 0; }
+    .md-preview code { background: var(--bg-elevated); padding: 2px 6px; border-radius: 3px; font-size: 12px; color: var(--spektra-accent); }
+    .md-preview pre { background: var(--bg-dark); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin: 8px 0; overflow-x: auto; }
+    .md-preview pre code { background: none; padding: 0; color: var(--text-primary); }
+    .md-preview blockquote { border-left: 3px solid var(--spektra); padding: 8px 14px; margin: 8px 0; background: rgba(124,58,237,.06); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--text-secondary); }
+    .md-preview ul, .md-preview ol { padding-left: 22px; margin: 6px 0; }
+    .md-preview li { margin: 4px 0; }
+    .md-preview strong { color: var(--text-primary); }
+    .md-preview table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+    .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 12px; }
+    .md-preview th { background: var(--bg-elevated); font-weight: 600; }
+    .source-view { font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: 12px; white-space: pre-wrap; background: var(--bg-dark); color: var(--text-primary); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); line-height: 1.6; }
+    .export-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+    .export-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+    .export-card p { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+    .tab.bastion-tab { background: #1a472a; color: #4ade80; border-bottom-color: #22c55e; }
+    .tab.bastion-tab.active { background: #166534; border-bottom: 2px solid #22c55e; }
+    .tab.bastion-tab .tab-close:hover { background: #dc2626; color: #fff; }
+    .hidden { display: none !important; }
+    .flex-row { display: flex; gap: 6px; }
+    .flex-row > * { flex: 1; }
+  </style>
+</head>
+<body>
+
+<div id="browser-panel">
+  <div id="tab-bar">
+    <div id="tabs-container"></div>
+    <button id="btn-new-tab" title="New tab">+</button>
+  </div>
+  <div id="nav-bar">
+    <button class="nav-btn" id="btn-back" title="Back">&#9664;</button>
+    <button class="nav-btn" id="btn-forward" title="Forward">&#9654;</button>
+    <button class="nav-btn" id="btn-reload" title="Reload">&#8635;</button>
+    <input id="url-bar" type="text" placeholder="Search or enter URL...">
+    <button class="nav-btn nav-btn-go" id="btn-go" title="Go">&#10132;</button>
+  </div>
+  <div id="webview-container">
+    <!-- Portal is rendered by WebContentsView overlay positioned here -->
+  </div>
+</div>
+
+<div id="recorder-panel">
+  <div id="recorder-header">
+    <div class="logo-icon">&#9881;</div>
+    <div class="brand">
+      <span class="brand-name">Spektra Lab Studio</span>
+      <span class="brand-sub">CloudLabs Guide Generator</span>
+    </div>
+  </div>
+  <div id="panel-tabs">
+    <button class="panel-tab active" data-panel="record">&#128308; Record</button>
+    <button class="panel-tab" data-panel="preview">&#128196; Preview</button>
+    <button class="panel-tab" data-panel="export">&#128229; Export</button>
+  </div>
+
+  <div class="panel-content active" id="panel-record">
+    <div id="setup-section" class="section">
+      <label>Lab Title</label>
+      <input id="lab-title" type="text" placeholder="e.g. Deploy a Virtual Machine on Azure">
+      <label style="margin-top:10px;">Start URL</label>
+      <input id="lab-url" type="text" value="https://portal.azure.com">
+      <label style="margin-top:10px;">Description (optional)</label>
+      <textarea id="lab-desc" rows="2" placeholder="Brief description of this lab exercise..."></textarea>
+      <button id="btn-start" class="btn btn-primary" style="margin-top:14px;">&#9654;&ensp;Start Recording</button>
+    </div>
+    <div id="recording-section" class="section hidden">
+      <label>Step Description</label>
+      <textarea id="step-desc" rows="2" placeholder="Describe the action you just performed..."></textarea>
+      <button id="btn-capture" class="btn btn-primary btn-icon">&#128247;&ensp;Capture Step</button>
+      <div class="flex-row" style="margin-top:6px;">
+        <button id="btn-generate" class="btn btn-secondary btn-icon" disabled>&#9996;&ensp;Generate Guide</button>
+        <button id="btn-stop" class="btn btn-danger btn-icon">&#9632;&ensp;Stop</button>
+      </div>
+    </div>
+    <div id="step-list-container">
+      <div class="steps-header">
+        <h3>Captured Steps</h3>
+        <span class="step-badge" id="step-count">0</span>
+      </div>
+      <div id="step-list"></div>
+    </div>
+  </div>
+
+  <div class="panel-content" id="panel-preview">
+    <div class="section" style="padding-bottom:0;">
+      <div class="flex-row">
+        <button id="btn-preview-rendered" class="btn btn-sm btn-primary">Rendered</button>
+        <button id="btn-preview-source" class="btn btn-sm btn-secondary">Source</button>
+      </div>
+    </div>
+    <div id="preview-content" style="flex:1;overflow-y:auto;padding:12px 16px;">
+      <div class="md-preview" id="md-rendered"><p style="color:var(--text-muted);text-align:center;margin-top:40px;">Generate a guide to see the preview here.</p></div>
+      <div class="source-view hidden" id="md-source"></div>
+    </div>
+  </div>
+
+  <div class="panel-content" id="panel-export">
+    <div style="padding:16px;overflow-y:auto;flex:1;">
+      <div class="export-card"><h4>&#128196; Save Markdown</h4><p>Save the generated guide as a .md file to any location.</p><button id="btn-save-md" class="btn btn-primary btn-sm">Save .md File</button></div>
+      <div class="export-card"><h4>&#128193; Open Output Folder</h4><p>Open the guide folder containing markdown and all screenshots.</p><button id="btn-open-folder" class="btn btn-secondary btn-sm">Open in Explorer</button></div>
+      <div class="export-card"><h4>&#128230; Export Complete Package</h4><p>Copy the full guide (markdown + screenshots) to a destination folder.</p><button id="btn-export" class="btn btn-secondary btn-sm">Export All</button></div>
+      <div class="export-card"><h4>&#128203; Copy to Clipboard</h4><p>Copy the raw markdown to clipboard for pasting elsewhere.</p><button id="btn-copy-md" class="btn btn-secondary btn-sm">Copy Markdown</button></div>
+    </div>
+  </div>
+
+  <div id="status-bar"><div class="status-dot"></div><span id="status-text">Ready</span></div>
+</div>
+
+
+<script>
+(function () {
+  console.log('[Studio] Script initializing...');
+  const webviewContainer = document.getElementById('webview-container');
+  const urlBar = document.getElementById('url-bar');
+  const tabsContainer = document.getElementById('tabs-container');
+  const setupSection = document.getElementById('setup-section');
+  const recordingSection = document.getElementById('recording-section');
+  const stepListContainer = document.getElementById('step-list-container');
+  const labTitle = document.getElementById('lab-title');
+  const labUrl = document.getElementById('lab-url');
+  const labDesc = document.getElementById('lab-desc');
+  const btnStart = document.getElementById('btn-start');
+  const stepDesc = document.getElementById('step-desc');
+  const btnCapture = document.getElementById('btn-capture');
+  const btnGenerate = document.getElementById('btn-generate');
+  const btnStop = document.getElementById('btn-stop');
+  const stepCount = document.getElementById('step-count');
+  const stepList = document.getElementById('step-list');
+  const statusBar = document.getElementById('status-bar');
+  const statusText = document.getElementById('status-text');
+  const mdRendered = document.getElementById('md-rendered');
+  const mdSource = document.getElementById('md-source');
+
+  let serverPort = 9005, recording = false, steps = [], capturing = false, lastGuideData = null;
+  let initReady = false;
+
+  function setStatus(msg, type) { statusText.textContent = msg; statusBar.className = type || ''; console.log('[Studio] Status:', msg, type || ''); }
+  function apiUrl(path) { return 'http://localhost:' + serverPort + path; }
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function navigateWebview(url) {
+    try { window.electronAPI.portalNavigate(url); } catch(e) { console.warn('[Studio] portalNavigate failed:', e); }
+  }
+
+  // Panel tabs
+  document.querySelectorAll('.panel-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+    });
+  });
+  document.getElementById('btn-preview-rendered').addEventListener('click', () => {
+    mdRendered.classList.remove('hidden'); mdSource.classList.add('hidden');
+    document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-primary';
+    document.getElementById('btn-preview-source').className = 'btn btn-sm btn-secondary';
+  });
+  document.getElementById('btn-preview-source').addEventListener('click', () => {
+    mdRendered.classList.add('hidden'); mdSource.classList.remove('hidden');
+    document.getElementById('btn-preview-source').className = 'btn btn-sm btn-primary';
+    document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-secondary';
+  });
+
+  // Browser tabs — portal tabs navigated via IPC to WebContentsView
+  let tabs = [], activeTabId = null;
+  function createBrowserTab(url, title) {
+    const id = 'tab-' + Date.now();
+    tabs.push({ id, url: url || 'about:blank', title: title || 'New Tab' });
+    renderTabs(); switchTab(id); return id;
+  }
+  function switchTab(id) {
+    activeTabId = id;
+    const tab = tabs.find(t => t.id === id);
+    if (!tab) return;
+    navigateWebview(tab.url);
+    urlBar.value = tab.url === 'about:blank' ? '' : tab.url;
+    renderTabs();
+  }
+  function closeTab(id) {
+    const idx = tabs.findIndex(t => t.id === id);
+    if (idx === -1) return;
+    tabs.splice(idx, 1);
+    if (tabs.length === 0) createBrowserTab();
+    else if (activeTabId === id) switchTab(tabs[tabs.length - 1].id);
+    else renderTabs();
+  }
+  function updateActiveTab(url, title) {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (!tab) return;
+    if (url) tab.url = url; if (title) tab.title = title; renderTabs();
+  }
+  function renderTabs() {
+    tabsContainer.innerHTML = '';
+    for (const tab of tabs) {
+      const el = document.createElement('div');
+      el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+      const t = tab.title.length > 22 ? tab.title.slice(0, 22) + '...' : tab.title;
+      el.innerHTML = '<span>' + escapeHtml(t) + '</span>';
+      if (tabs.length > 1) {
+        const cb = document.createElement('button'); cb.className = 'tab-close'; cb.textContent = '\u00d7';
+        cb.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tab.id); });
+        el.appendChild(cb);
+      }
+      el.addEventListener('click', () => switchTab(tab.id));
+      tabsContainer.appendChild(el);
+    }
+  }
+  createBrowserTab('about:blank', 'New Tab');
+  document.getElementById('btn-new-tab').addEventListener('click', () => createBrowserTab());
+
+  // Navigation
+  function navigateToUrl() {
+    let url = urlBar.value.trim(); if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    urlBar.value = url; navigateWebview(url); updateActiveTab(url);
+  }
+  document.getElementById('btn-back').addEventListener('click', () => window.electronAPI.portalGoBack());
+  document.getElementById('btn-forward').addEventListener('click', () => window.electronAPI.portalGoForward());
+  document.getElementById('btn-reload').addEventListener('click', () => window.electronAPI.portalReload());
+  document.getElementById('btn-go').addEventListener('click', navigateToUrl);
+  urlBar.addEventListener('keydown', (e) => { if (e.key === 'Enter') navigateToUrl(); });
+
+  // Portal events via CustomEvents dispatched by preload
+  window.addEventListener('portal-navigated', (e) => { urlBar.value = e.detail; updateActiveTab(e.detail); });
+  window.addEventListener('portal-title-updated', (e) => { updateActiveTab(null, e.detail); });
+  window.addEventListener('portal-fail-load', (e) => { setStatus('Page failed: ' + (e.detail || 'unknown'), 'error'); });
+  window.addEventListener('portal-finish-load', async () => {
+    if (recording) await window.electronAPI.injectClickTracker();
+  });
+
+  // Bastion window tracking — add bastion tab to tab bar
+  let bastionActive = false;
+  let bastionTabEl = null;
+
+  function showBastionTab(url) {
+    if (bastionTabEl) return; // already shown
+    bastionTabEl = document.createElement('div');
+    bastionTabEl.className = 'tab bastion-tab active';
+    bastionTabEl.innerHTML = '<span>&#128274; Bastion</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tab-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.electronAPI.switchToPortal();
+      switchToPortalTab();
+    });
+    bastionTabEl.appendChild(closeBtn);
+    bastionTabEl.addEventListener('click', () => {
+      window.electronAPI.switchToBastion();
+      switchToBastionTab();
+    });
+    tabsContainer.appendChild(bastionTabEl);
+    switchToBastionTab();
+  }
+
+  function switchToBastionTab() {
+    // Deactivate all portal tabs
+    tabsContainer.querySelectorAll('.tab:not(.bastion-tab)').forEach(t => t.classList.remove('active'));
+    if (bastionTabEl) bastionTabEl.classList.add('active');
+  }
+
+  function switchToPortalTab() {
+    if (bastionTabEl) bastionTabEl.classList.remove('active');
+    // Activate the current portal tab
+    const portalTabs = tabsContainer.querySelectorAll('.tab:not(.bastion-tab)');
+    if (portalTabs.length > 0) portalTabs[portalTabs.length - 1].classList.add('active');
+  }
+
+  function removeBastionTab() {
+    if (bastionTabEl) { bastionTabEl.remove(); bastionTabEl = null; }
+    switchToPortalTab();
+  }
+
+  // When a portal tab is clicked, switch view to portal
+  const origSwitchTab = switchTab;
+  switchTab = function(id) {
+    origSwitchTab(id);
+    if (bastionActive) {
+      window.electronAPI.switchToPortal();
+      switchToPortalTab();
+    }
+  };
+
+  window.addEventListener('bastion-opened', async (e) => {
+    bastionActive = true;
+    console.log('[Studio] Bastion opened:', e.detail);
+    showBastionTab(e.detail);
+    setStatus('Bastion connected — embedded in studio', 'success');
+    if (recording) await window.electronAPI.injectClickTracker();
+  });
+  window.addEventListener('bastion-closed', () => {
+    bastionActive = false;
+    console.log('[Studio] Bastion closed');
+    removeBastionTab();
+    setStatus(recording ? 'Recording — captures target Portal' : 'Ready');
+  });
+
+  async function init() {
+    try {
+      serverPort = await window.electronAPI.getPort();
+      console.log('[Studio] Server port:', serverPort);
+    } catch(e) { console.error('[Studio] getPort failed:', e); }
+
+    // Report portal container bounds so main process can position the WebContentsView overlay
+    const container = document.getElementById('webview-container');
+    function reportBounds() {
+      const r = container.getBoundingClientRect();
+      window.electronAPI.reportPortalBounds({
+        x: Math.round(r.x), y: Math.round(r.y),
+        width: Math.round(r.width), height: Math.round(r.height)
+      });
+    }
+    const ro = new ResizeObserver(reportBounds);
+    ro.observe(container);
+    window.addEventListener('resize', reportBounds);
+    reportBounds();
+
+    initReady = true;
+  }
+  init();
+
+  // Start recording
+  btnStart.addEventListener('click', async () => {
+    console.log('[Studio] Start Recording clicked');
+    const title = labTitle.value.trim(), url = labUrl.value.trim();
+    if (!title) { setStatus('Please enter a lab title.', 'error'); return; }
+    if (!url) { setStatus('Please enter a start URL.', 'error'); return; }
+    btnStart.disabled = true; setStatus('Starting session...', 'warning');
+    try {
+      // Wait for init if not done yet
+      if (!initReady) {
+        console.log('[Studio] Waiting for init...');
+        await new Promise(r => { const i = setInterval(() => { if (initReady) { clearInterval(i); r(); } }, 50); });
+      }
+      console.log('[Studio] Fetching /api/session/start on port', serverPort);
+      const resp = await fetch(apiUrl('/api/session/start'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, url, description: labDesc.value.trim() }) });
+      console.log('[Studio] Response status:', resp.status);
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Failed');
+      navigateWebview(url); updateActiveTab(url, title); recording = true; steps = [];
+      setupSection.classList.add('hidden'); recordingSection.classList.remove('hidden');
+      stepList.innerHTML = ''; stepCount.textContent = '0'; btnGenerate.disabled = true;
+      setStatus('Recording \u2014 perform actions and capture steps.', 'success');
+      console.log('[Studio] Recording started successfully');
+    } catch (err) { console.error('[Studio] Start error:', err); setStatus('Error: ' + err.message, 'error'); }
+    finally { btnStart.disabled = false; }
+  });
+
+  // Capture step
+  btnCapture.addEventListener('click', async () => {
+    if (capturing) return; capturing = true; btnCapture.disabled = true;
+    setStatus('Capturing screenshot' + (bastionActive ? ' from Bastion' : '') + '...', 'warning');
+    try {
+      const base64 = await window.electronAPI.captureScreenshot();
+      if (!base64) throw new Error('Screenshot capture returned empty');
+      const pageInfo = await window.electronAPI.getWebviewInfo();
+      const desc = stepDesc.value.trim() || 'Step ' + (steps.length + 1);
+      const resp = await fetch(apiUrl('/api/desktop/capture'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ screenshot: base64, description: desc, clickBox: null, pageUrl: pageInfo.url, pageTitle: pageInfo.title, dpr: 1 }) });
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Capture failed');
+      const step = await resp.json(); steps.push(step);
+      renderStep(step); stepCount.textContent = String(steps.length); stepDesc.value = ''; btnGenerate.disabled = false;
+      setStatus('Step ' + step.stepNumber + ' captured!', 'success');
+    } catch (err) { setStatus('Capture error: ' + err.message, 'error'); }
+    finally { capturing = false; btnCapture.disabled = false; }
+  });
+
+  function renderStep(step) {
+    const card = document.createElement('div'); card.className = 'step-card'; card.dataset.num = step.stepNumber;
+    card.innerHTML = '<div class="step-top"><span class="step-num">Step ' + step.stepNumber + '</span><div class="step-actions">'
+      + '<button class="step-action-btn danger" title="Delete" data-action="delete">&times;</button></div></div>'
+      + '<div class="step-desc">' + escapeHtml(step.description) + '</div>'
+      + '<img class="step-thumb" src="' + apiUrl('/' + step.screenshotRelative) + '?t=' + Date.now() + '" alt="Step ' + step.stepNumber + '">';
+    card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteStep(step.stepNumber, card));
+    card.querySelector('.step-thumb').addEventListener('click', () => openEditor(step));
+    stepList.appendChild(card); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function deleteStep(num, card) {
+    try { const resp = await fetch(apiUrl('/api/session/step/' + num), { method: 'DELETE' });
+      if (resp.ok) { card.remove(); steps = steps.filter(s => s.stepNumber !== num); stepCount.textContent = String(steps.length); if (steps.length === 0) btnGenerate.disabled = true; setStatus('Step ' + num + ' deleted.'); }
+    } catch (err) { setStatus('Delete error: ' + err.message, 'error'); }
+  }
+
+  // Generate guide
+  btnGenerate.addEventListener('click', async () => {
+    btnGenerate.disabled = true; setStatus('Generating guide with AI \u2014 please wait...', 'warning');
+    try {
+      const resp = await fetch(apiUrl('/api/session/generate'), { method: 'POST' });
+      if (!resp.ok) throw new Error((await resp.json()).error || 'Generation failed');
+      const data = await resp.json(); lastGuideData = data;
+      const md = data.markdown || data.guide || '';
+      renderMarkdownPreview(md); mdSource.textContent = md;
+      document.querySelector('.panel-tab[data-panel="preview"]').click();
+      setStatus('Guide generated successfully!', 'success');
+    } catch (err) { setStatus('Generation error: ' + err.message, 'error'); btnGenerate.disabled = false; }
+  });
+
+  function renderMarkdownPreview(md) {
+    let html = md
+      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+      .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="preview-editable-img" style="cursor:pointer;">')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--info)">$1</a>')
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+      .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    html = html.replace(/src="screenshots\//g, 'src="' + apiUrl('/screenshots/'));
+    mdRendered.innerHTML = '<p>' + html + '</p>';
+
+    // Make preview images clickable — open editor for crop/draw box
+    mdRendered.querySelectorAll('.preview-editable-img').forEach(img => {
+      img.title = 'Click to edit — crop or draw box';
+      img.addEventListener('click', (e) => {
+        e.preventDefault();
+        const src = img.getAttribute('src');
+        const step = steps.find(s => src.includes(s.screenshotRelative));
+        if (step) {
+          openEditor(step);
+        } else {
+          setStatus('Could not match image to a step. Edit from the step card instead.', 'warning');
+        }
+      });
+    });
+  }
+
+  // Export actions
+  document.getElementById('btn-save-md').addEventListener('click', async () => {
+    if (!lastGuideData) { setStatus('Generate a guide first.', 'error'); return; }
+    const saved = await window.electronAPI.saveGuide({ markdown: lastGuideData.markdown || lastGuideData.guide, defaultName: 'guide.md' });
+    if (saved) setStatus('Saved to: ' + saved, 'success');
+  });
+  document.getElementById('btn-open-folder').addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder available.', 'error'); return; }
+    await window.electronAPI.openFolder(lastGuideData.guideDir);
+  });
+  document.getElementById('btn-export').addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder available.', 'error'); return; }
+    const dest = await window.electronAPI.exportGuideFolder({ guideDir: lastGuideData.guideDir });
+    if (dest) setStatus('Exported to: ' + dest, 'success');
+  });
+  document.getElementById('btn-copy-md').addEventListener('click', () => {
+    if (!lastGuideData) { setStatus('Generate a guide first.', 'error'); return; }
+    navigator.clipboard.writeText(lastGuideData.markdown || lastGuideData.guide || '').then(() => setStatus('Copied to clipboard!', 'success'));
+  });
+
+  // Stop & reset
+  btnStop.addEventListener('click', async () => {
+    if (!confirm('Stop recording and discard all steps?')) return;
+    try { await fetch(apiUrl('/api/session/cancel'), { method: 'POST' }); } catch {}
+    recording = false; steps = []; stepList.innerHTML = ''; stepCount.textContent = '0';
+    recordingSection.classList.add('hidden'); setupSection.classList.remove('hidden');
+    navigateWebview('about:blank'); setStatus('Ready');
+  });
+
+  // ══ Screenshot Editor (Popup Window) ══
+  function openEditor(step) {
+    if (!step || !step.screenshotPath) { setStatus('No screenshot path for this step.', 'error'); return; }
+    window.electronAPI.openEditor({
+      stepNumber: step.stepNumber,
+      screenshotRelative: step.screenshotRelative,
+      screenshotPath: step.screenshotPath,
+      screenshotFilename: step.screenshotFilename,
+      guideDir: lastGuideData && lastGuideData.guideDir ? lastGuideData.guideDir : null,
+    });
+  }
+
+  // Listen for editor-saved event from popup → refresh images
+  window.addEventListener('editor-saved', (e) => {
+    const { stepNumber } = e.detail;
+    const step = steps.find(s => s.stepNumber === stepNumber);
+    if (!step) return;
+    const ts = '?t=' + Date.now();
+    // Refresh thumbnail in step list
+    const thumb = stepList.querySelector('[data-num="' + stepNumber + '"] .step-thumb');
+    if (thumb) thumb.src = apiUrl('/' + step.screenshotRelative) + ts;
+    // Refresh images in preview panel
+    mdRendered.querySelectorAll('.preview-editable-img').forEach(img => {
+      if (img.getAttribute('src').includes(step.screenshotRelative)) {
+        img.src = apiUrl('/' + step.screenshotRelative) + ts;
+      }
+    });
+    setStatus('Screenshot updated!', 'success');
+  });
+
+  console.log('[Studio] All event listeners attached successfully.');
+})();
+</script>
+</body>
+</html>
