@@ -350,6 +350,20 @@ ipcMain.handle('export-guide-folder', async (_, { guideDir }) => {
   return dest;
 });
 
+// Save edited guide markdown back to the output guide.md
+ipcMain.handle('save-guide-to-dir', async (_, { guideDir, markdown }) => {
+  if (!guideDir || !markdown) return false;
+  try {
+    const guidePath = join(guideDir, 'guide.md');
+    writeFileSync(guidePath, markdown, 'utf-8');
+    console.log('[Guide] Saved edited guide to:', guidePath);
+    return true;
+  } catch (err) {
+    console.error('[Guide] Save failed:', err.message);
+    return false;
+  }
+});
+
 // ── Screenshot Editor Popup ──
 let editorWindow = null;
 let editorStepNumber = null;

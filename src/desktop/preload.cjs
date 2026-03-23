@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Open screenshot in popup editor
   openEditor: (data) => ipcRenderer.invoke('open-editor', data),
+
+  // Save edited guide markdown back to guide dir
+  saveGuideToDir: (opts) => ipcRenderer.invoke('save-guide-to-dir', opts),
 });
 
 // Portal events — main process → renderer (via window events, safe with contextIsolation)

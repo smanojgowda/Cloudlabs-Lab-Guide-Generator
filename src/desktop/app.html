@@ -204,11 +204,19 @@
       <div class="flex-row">
         <button id="btn-preview-rendered" class="btn btn-sm btn-primary">Rendered</button>
         <button id="btn-preview-source" class="btn btn-sm btn-secondary">Source</button>
+        <button id="btn-edit-guide" class="btn btn-sm btn-secondary" style="flex:none;width:auto;padding:6px 14px;">&#9998; Edit</button>
       </div>
     </div>
     <div id="preview-content" style="flex:1;overflow-y:auto;padding:12px 16px;">
       <div class="md-preview" id="md-rendered"><p style="color:var(--text-muted);text-align:center;margin-top:40px;">Generate a guide to see the preview here.</p></div>
       <div class="source-view hidden" id="md-source"></div>
+      <div id="md-editor-wrap" class="hidden" style="display:none;flex-direction:column;height:100%;">
+        <textarea id="md-editor" style="flex:1;width:100%;min-height:300px;background:var(--bg-dark);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:12px;line-height:1.6;resize:none;outline:none;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button id="btn-editor-save" class="btn btn-sm btn-primary" style="flex:none;width:auto;padding:6px 16px;">&#10004; Save Changes</button>
+          <button id="btn-editor-cancel" class="btn btn-sm btn-secondary" style="flex:none;width:auto;padding:6px 16px;">Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -271,13 +279,59 @@
   });
   document.getElementById('btn-preview-rendered').addEventListener('click', () => {
     mdRendered.classList.remove('hidden'); mdSource.classList.add('hidden');
+    document.getElementById('md-editor-wrap').style.display = 'none'; document.getElementById('md-editor-wrap').classList.add('hidden');
     document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-primary';
     document.getElementById('btn-preview-source').className = 'btn btn-sm btn-secondary';
+    document.getElementById('btn-edit-guide').className = 'btn btn-sm btn-secondary';
   });
   document.getElementById('btn-preview-source').addEventListener('click', () => {
     mdRendered.classList.add('hidden'); mdSource.classList.remove('hidden');
+    document.getElementById('md-editor-wrap').style.display = 'none'; document.getElementById('md-editor-wrap').classList.add('hidden');
     document.getElementById('btn-preview-source').className = 'btn btn-sm btn-primary';
     document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-secondary';
+    document.getElementById('btn-edit-guide').className = 'btn btn-sm btn-secondary';
+  });
+
+  // Edit guide markdown
+  document.getElementById('btn-edit-guide').addEventListener('click', () => {
+    if (!lastGuideData) { setStatus('Generate a guide first.', 'error'); return; }
+    const md = lastGuideData.markdown || lastGuideData.guide || '';
+    const editorWrap = document.getElementById('md-editor-wrap');
+    document.getElementById('md-editor').value = md;
+    mdRendered.classList.add('hidden'); mdSource.classList.add('hidden');
+    editorWrap.classList.remove('hidden'); editorWrap.style.display = 'flex';
+    document.getElementById('btn-edit-guide').className = 'btn btn-sm btn-primary';
+    document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-secondary';
+    document.getElementById('btn-preview-source').className = 'btn btn-sm btn-secondary';
+  });
+  document.getElementById('btn-editor-save').addEventListener('click', async () => {
+    const newMd = document.getElementById('md-editor').value;
+    if (lastGuideData) {
+      if (lastGuideData.markdown) lastGuideData.markdown = newMd;
+      else lastGuideData.guide = newMd;
+    }
+    renderMarkdownPreview(newMd); mdSource.textContent = newMd;
+    // Save to guide directory if available
+    if (lastGuideData && lastGuideData.guideDir) {
+      const ok = await window.electronAPI.saveGuideToDir({ guideDir: lastGuideData.guideDir, markdown: newMd });
+      if (ok) setStatus('Guide saved successfully!', 'success');
+      else setStatus('Guide updated in memory (could not write to disk).', 'warning');
+    } else {
+      setStatus('Guide updated. Use Export to save.', 'success');
+    }
+    // Switch back to rendered view
+    const editorWrap = document.getElementById('md-editor-wrap');
+    editorWrap.classList.add('hidden'); editorWrap.style.display = 'none';
+    mdRendered.classList.remove('hidden');
+    document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-primary';
+    document.getElementById('btn-edit-guide').className = 'btn btn-sm btn-secondary';
+  });
+  document.getElementById('btn-editor-cancel').addEventListener('click', () => {
+    const editorWrap = document.getElementById('md-editor-wrap');
+    editorWrap.classList.add('hidden'); editorWrap.style.display = 'none';
+    mdRendered.classList.remove('hidden');
+    document.getElementById('btn-preview-rendered').className = 'btn btn-sm btn-primary';
+    document.getElementById('btn-edit-guide').className = 'btn btn-sm btn-secondary';
   });
 
   // Browser tabs — portal tabs navigated via IPC to WebContentsView
