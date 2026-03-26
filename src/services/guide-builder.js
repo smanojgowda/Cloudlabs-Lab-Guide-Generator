@@ -2,11 +2,70 @@
  * Guide Builder — assemble the final CloudLabs-format Markdown lab guide
  * Record Mode: takes recorded steps (not a plan) and generates the guide.
  */
-import { writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
-import { resolve } from 'path';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, copyFileSync, readdirSync } from 'fs';
+import { resolve, join } from 'path';
 import config from '../config.js';
 import logger from '../utils/logger.js';
 import { generateGuide } from './llm.js';
+
+/**
+ * Version the current guide.md before overwriting it.
+ * Saves to `versions/guide.v1.md`, `guide.v2.md`, etc.
+ * Returns the version number created, or 0 if no previous guide existed.
+ */
+export function versionGuide(guideDir) {
+  const guidePath = resolve(guideDir, 'guide.md');
+  if (!existsSync(guidePath)) return 0;
+
+  const versionsDir = resolve(guideDir, 'versions');
+  if (!existsSync(versionsDir)) mkdirSync(versionsDir, { recursive: true });
+
+  // Find next version number
+  const existing = readdirSync(versionsDir).filter(f => /^guide\.v\d+\.md$/.test(f));
+  const nums = existing.map(f => parseInt(f.match(/\.v(\d+)\./)[1], 10));
+  const nextVersion = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+
+  const currentContent = readFileSync(guidePath, 'utf-8');
+  const versionPath = resolve(versionsDir, `guide.v${nextVersion}.md`);
+  writeFileSync(versionPath, currentContent, 'utf-8');
+  logger.info(`Guide versioned: v${nextVersion} saved to ${versionPath}`);
+  return nextVersion;
+}
+
+/**
+ * List all versions of a guide in a directory.
+ * Returns array of { version, filename, path } sorted by version number.
+ */
+export function listGuideVersions(guideDir) {
+  const versionsDir = resolve(guideDir, 'versions');
+  if (!existsSync(versionsDir)) return [];
+
+  return readdirSync(versionsDir)
+    .filter(f => /^guide\.v\d+\.md$/.test(f))
+    .map(f => {
+      const version = parseInt(f.match(/\.v(\d+)\./)[1], 10);
+      return { version, filename: f, path: resolve(versionsDir, f) };
+    })
+    .sort((a, b) => a.version - b.version);
+}
+
+/**
+ * Restore a specific version as the current guide.md.
+ * Versions the current guide first before restoring.
+ */
+export function restoreGuideVersion(guideDir, version) {
+  const versionPath = resolve(guideDir, 'versions', `guide.v${version}.md`);
+  if (!existsSync(versionPath)) throw new Error(`Version ${version} not found`);
+
+  // Save current as a new version before restoring
+  versionGuide(guideDir);
+
+  const content = readFileSync(versionPath, 'utf-8');
+  const guidePath = resolve(guideDir, 'guide.md');
+  writeFileSync(guidePath, content, 'utf-8');
+  logger.info(`Guide restored from v${version}`);
+  return content;
+}
 
 /**
  * Build the final lab guide from recorded steps.
@@ -43,6 +102,9 @@ export async function buildGuide(recordedSteps, labTitle, labDescription, guideN
     markdown = buildFallbackMarkdown(labTitle, labDescription, recordedSteps);
   }
 
+  // Version the existing guide before overwriting
+  versionGuide(guideDir);
+
   // Write the guide
   const mdPath = resolve(guideDir, 'guide.md');
   writeFileSync(mdPath, markdown, 'utf-8');
@@ -50,6 +112,7 @@ export async function buildGuide(recordedSteps, labTitle, labDescription, guideN
 
   // Write JSON manifest
   const manifest = {
+    schemaVersion: 2,
     labTitle,
     labDescription,
     generatedAt: new Date().toISOString(),
@@ -60,7 +123,10 @@ export async function buildGuide(recordedSteps, labTitle, labDescription, guideN
       screenshot: s.screenshotFilename,
       pageUrl: s.pageUrl,
       pageTitle: s.pageTitle,
-      annotations: s.annotations || [],
+      annotations: (s.annotations || []).map(ann => ({
+        ...ann,
+        pageUrl: ann.pageUrl || s.pageUrl || '',
+      })),
     })),
   };
   writeFileSync(resolve(guideDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');

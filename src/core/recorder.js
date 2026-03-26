@@ -49,20 +49,45 @@ export async function startRecording(page) {
 
   // Inject click tracker — persists across navigations via addInitScript
   await page.addInitScript(() => {
+    window.__buildCssSelector = function(el) {
+      const tag = el.tagName.toLowerCase();
+      const aria = el.getAttribute('aria-label');
+      if (aria) return tag + '[aria-label="' + aria.replace(/"/g, '\\"') + '"]';
+      const testId = el.getAttribute('data-testid');
+      if (testId) return tag + '[data-testid="' + testId + '"]';
+      if (el.id) return '#' + el.id;
+      const role = el.getAttribute('role');
+      const text = (el.textContent || '').trim().slice(0, 50);
+      if (role && text) return tag + '[role="' + role + '"]';
+      if (el.name) return tag + '[name="' + el.name + '"]';
+      const cls = Array.from(el.classList || []).filter(c => !c.match(/^(x-|_|ember)/)).slice(0, 3).join('.');
+      if (cls) return tag + '.' + cls;
+      return tag;
+    };
     window.__lastClickedElements = [];
     document.addEventListener('click', (e) => {
       const el = e.target.closest('button, a, [role="button"], [role="menuitem"], [role="tab"], [role="link"], input, select, textarea, [data-testid], .fxs-blade-title-titleText, .azc-toolbarButton, .ms-Button') || e.target;
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
+        const parentEl = el.parentElement;
         window.__lastClickedElements.push({
           x: rect.x, y: rect.y, width: rect.width, height: rect.height,
           tag: el.tagName.toLowerCase(),
-          text: (el.textContent || '').trim().slice(0, 100),
+          text: (el.textContent || '').trim().slice(0, 120),
+          ariaLabel: el.getAttribute('aria-label') || '',
+          role: el.getAttribute('role') || '',
+          id: el.id || '',
+          placeholder: el.getAttribute('placeholder') || '',
+          className: (el.className || '').toString().slice(0, 200),
+          href: el.getAttribute('href') || '',
+          title: el.getAttribute('title') || '',
+          name: el.getAttribute('name') || '',
+          dataTestId: el.getAttribute('data-testid') || '',
+          type: el.getAttribute('type') || '',
+          cssSelector: window.__buildCssSelector(el),
+          parentText: parentEl ? (parentEl.textContent || '').trim().slice(0, 80) : '',
         });
-        // Keep only last 10
-        if (window.__lastClickedElements.length > 10) {
-          window.__lastClickedElements.shift();
-        }
+        if (window.__lastClickedElements.length > 10) window.__lastClickedElements.shift();
       }
     }, true);
   });
@@ -70,19 +95,45 @@ export async function startRecording(page) {
   // Also inject immediately for the current page
   await page.evaluate(() => {
     if (window.__lastClickedElements) return;
+    window.__buildCssSelector = function(el) {
+      const tag = el.tagName.toLowerCase();
+      const aria = el.getAttribute('aria-label');
+      if (aria) return tag + '[aria-label="' + aria.replace(/"/g, '\\"') + '"]';
+      const testId = el.getAttribute('data-testid');
+      if (testId) return tag + '[data-testid="' + testId + '"]';
+      if (el.id) return '#' + el.id;
+      const role = el.getAttribute('role');
+      const text = (el.textContent || '').trim().slice(0, 50);
+      if (role && text) return tag + '[role="' + role + '"]';
+      if (el.name) return tag + '[name="' + el.name + '"]';
+      const cls = Array.from(el.classList || []).filter(c => !c.match(/^(x-|_|ember)/)).slice(0, 3).join('.');
+      if (cls) return tag + '.' + cls;
+      return tag;
+    };
     window.__lastClickedElements = [];
     document.addEventListener('click', (e) => {
       const el = e.target.closest('button, a, [role="button"], [role="menuitem"], [role="tab"], [role="link"], input, select, textarea, [data-testid], .fxs-blade-title-titleText, .azc-toolbarButton, .ms-Button') || e.target;
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
+        const parentEl = el.parentElement;
         window.__lastClickedElements.push({
           x: rect.x, y: rect.y, width: rect.width, height: rect.height,
           tag: el.tagName.toLowerCase(),
-          text: (el.textContent || '').trim().slice(0, 100),
+          text: (el.textContent || '').trim().slice(0, 120),
+          ariaLabel: el.getAttribute('aria-label') || '',
+          role: el.getAttribute('role') || '',
+          id: el.id || '',
+          placeholder: el.getAttribute('placeholder') || '',
+          className: (el.className || '').toString().slice(0, 200),
+          href: el.getAttribute('href') || '',
+          title: el.getAttribute('title') || '',
+          name: el.getAttribute('name') || '',
+          dataTestId: el.getAttribute('data-testid') || '',
+          type: el.getAttribute('type') || '',
+          cssSelector: window.__buildCssSelector(el),
+          parentText: parentEl ? (parentEl.textContent || '').trim().slice(0, 80) : '',
         });
-        if (window.__lastClickedElements.length > 10) {
-          window.__lastClickedElements.shift();
-        }
+        if (window.__lastClickedElements.length > 10) window.__lastClickedElements.shift();
       }
     }, true);
   }).catch(() => {});
@@ -108,8 +159,9 @@ export async function captureStep(description = '') {
 
   // Get the last-clicked element's bounding box for annotation
   let annotations = null;
+  let lastClicked = null;
   try {
-    const lastClicked = await currentPage.evaluate(() => {
+    lastClicked = await currentPage.evaluate(() => {
       const arr = window.__lastClickedElements;
       if (!arr || arr.length === 0) return null;
       // Pop the last clicked element (consume it)
@@ -134,11 +186,8 @@ export async function captureStep(description = '') {
 
   let screenshot;
   try {
-    if (annotations) {
-      screenshot = await captureAndProcess(currentPage, annotations, filename);
-    } else {
-      screenshot = await captureClean(currentPage, filename);
-    }
+    // Always capture clean screenshot — no red box or step number overlays
+    screenshot = await captureClean(currentPage, filename);
   } catch (err) {
     logger.error(`Screenshot capture failed: ${err.message}`);
     throw err;
@@ -146,6 +195,32 @@ export async function captureStep(description = '') {
 
   const pageUrl = currentPage.url();
   const pageTitle = await currentPage.title().catch(() => '');
+
+  // Build rich annotation data from click tracker
+  let stepAnnotations = [];
+  if (lastClicked && annotations) {
+    stepAnnotations = [{
+      number: annotationNumber,
+      action: 'click',
+      target: {
+        cssSelector: lastClicked.cssSelector || '',
+        text: lastClicked.text || '',
+        ariaLabel: lastClicked.ariaLabel || '',
+        role: lastClicked.role || '',
+        tagName: lastClicked.tag || '',
+        id: lastClicked.id || '',
+        className: lastClicked.className || '',
+        dataTestId: lastClicked.dataTestId || '',
+        placeholder: lastClicked.placeholder || '',
+        title: lastClicked.title || '',
+        href: lastClicked.href || '',
+        name: lastClicked.name || '',
+        type: lastClicked.type || '',
+        parentText: lastClicked.parentText || '',
+      },
+      boundingBox: { x: lastClicked.x, y: lastClicked.y, width: lastClicked.width, height: lastClicked.height },
+    }];
+  }
 
   const step = {
     stepNumber: stepCounter,
@@ -155,7 +230,7 @@ export async function captureStep(description = '') {
     screenshotRelative: screenshot.relativePath,
     pageUrl,
     pageTitle,
-    annotations: annotations ? [{ number: annotationNumber }] : [],
+    annotations: stepAnnotations,
     timestamp: new Date().toISOString(),
   };
 
@@ -212,14 +287,11 @@ export async function captureAnnotatedStep(description, highlights = []) {
 
   let screenshot;
   try {
-    screenshot = await captureAndProcess(
-      currentPage,
-      annotations.length > 0 ? annotations : null,
-      filename,
-    );
-  } catch (err) {
-    logger.error(`Annotated screenshot failed: ${err.message}`);
+    // Always capture clean screenshot — no red box or step number overlays
     screenshot = await captureClean(currentPage, filename);
+  } catch (err) {
+    logger.error(`Screenshot capture failed: ${err.message}`);
+    throw err;
   }
 
   const pageUrl = currentPage.url();
@@ -395,9 +467,47 @@ export async function addCapturedStep({ description, buffer, clickBox, pageUrl, 
   if (!recording) throw new Error('Not recording — start a session first.');
 
   stepCounter++;
+  const annotationNumber = stepCounter;
   const filename = `step-${String(stepCounter).padStart(2, '0')}.png`;
 
-  // Save clean screenshot without any auto-annotations
+  // Build annotations from click data if available
+  let annotations = null;
+  let stepAnnotations = [];
+  if (clickBox && clickBox.width > 0 && clickBox.height > 0) {
+    const scale = dpr || 1;
+    annotations = [{
+      boundingBox: {
+        x: clickBox.x * scale,
+        y: clickBox.y * scale,
+        width: clickBox.width * scale,
+        height: clickBox.height * scale,
+      },
+      number: annotationNumber,
+    }];
+    stepAnnotations = [{
+      number: annotationNumber,
+      action: 'click',
+      target: {
+        cssSelector: clickBox.cssSelector || '',
+        text: clickBox.text || '',
+        ariaLabel: clickBox.ariaLabel || '',
+        role: clickBox.role || '',
+        tagName: clickBox.tag || '',
+        id: clickBox.id || '',
+        className: clickBox.className || '',
+        dataTestId: clickBox.dataTestId || '',
+        placeholder: clickBox.placeholder || '',
+        title: clickBox.title || '',
+        href: clickBox.href || '',
+        name: clickBox.name || '',
+        type: clickBox.type || '',
+        parentText: clickBox.parentText || '',
+      },
+      boundingBox: { x: clickBox.x, y: clickBox.y, width: clickBox.width, height: clickBox.height },
+    }];
+  }
+
+  // Save clean screenshot — no red box or step number overlays
   const screenshot = await annotateBuffer(buffer, null, filename);
 
   const step = {
@@ -408,11 +518,11 @@ export async function addCapturedStep({ description, buffer, clickBox, pageUrl, 
     screenshotRelative: screenshot.relativePath,
     pageUrl: pageUrl || '',
     pageTitle: pageTitle || '',
-    annotations: [],
+    annotations: stepAnnotations,
     timestamp: new Date().toISOString(),
   };
 
   recordedSteps.push(step);
-  logger.info(`Step ${stepCounter} captured: ${filename} (clean) — "${description || 'no description'}"`);
+  logger.info(`Step ${stepCounter} captured: ${filename}${annotations ? ' (annotated)' : ' (clean)'} — "${description || 'no description'}"`);
   return step;
 }

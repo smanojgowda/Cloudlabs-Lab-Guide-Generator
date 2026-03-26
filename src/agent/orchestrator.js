@@ -11,7 +11,7 @@ import { launch, getPage, getContext, saveAuth, close } from '../core/browser.js
 import {
   startRecording, stopRecording, captureStep, captureAnnotatedStep,
   getSteps, isRecording, getStepCount, deleteStep, updateStepDescription,
-  getElementAtPoint, resetRecorder, startDesktopRecording, addCapturedStep,
+  resetRecorder, startDesktopRecording, addCapturedStep,
 } from '../core/recorder.js';
 import { captureClean } from '../core/screenshot.js';
 import { buildGuide } from '../services/guide-builder.js';
@@ -98,13 +98,6 @@ export async function recordStep(description, highlights) {
     return captureAnnotatedStep(description, highlights);
   }
   return captureStep(description);
-}
-
-/**
- * Get element info at a viewport coordinate (for the UI overlay).
- */
-export async function inspectElement(x, y) {
-  return getElementAtPoint(x, y);
 }
 
 /**

@@ -16,6 +16,7 @@
     #toolbar button { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s; }
     #toolbar button:hover { background: var(--border); }
     #toolbar button.active { background: var(--spektra); color: #fff; border-color: var(--spektra); }
+    #toolbar button.tool-blur.active { background: #e05d44; border-color: #e05d44; }
     #toolbar .sep { width: 1px; height: 24px; background: var(--border); }
     #toolbar label { font-size: 12px; color: var(--text-secondary); }
     #toolbar input[type="color"], #toolbar input[type="number"] { background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 12px; }
@@ -32,11 +33,17 @@
 <body>
   <div id="toolbar">
     <button id="tool-rect" class="active" title="Draw box">&#9645; Box</button>
+    <button id="tool-blur" class="tool-blur" title="Blur sensitive area">&#128065;&#8416; Blur</button>
     <button id="tool-step" title="Place numbered step circle">&#9312; Step</button>
     <button id="tool-crop" title="Crop">&#9986; Crop</button>
     <div class="sep"></div>
     <label>Color:</label><input type="color" id="ed-color" value="#ff0000">
     <label>Width:</label><input type="number" id="ed-stroke" value="4" min="1" max="16" style="width:50px;">
+    <div class="sep" id="sep-blur-intensity" style="display:none;"></div>
+    <div class="step-size-group" id="blur-intensity-group" style="display:none;">
+      <label>Blur:</label><input type="range" id="ed-blur-intensity" min="4" max="40" value="16" style="width:90px;" title="Blur intensity">
+      <span id="blur-val" style="font-size:12px;color:var(--text-secondary);min-width:24px;">16</span>
+    </div>
     <div class="sep" id="sep-step-size" style="display:none;"></div>
     <div class="step-size-group" id="step-size-group" style="display:none;">
       <label>Size:</label><input type="number" id="ed-step-size" value="28" min="14" max="80" style="width:55px;">
@@ -59,6 +66,7 @@
   const ctx = canvas.getContext('2d');
   let img = null, tool = 'rect';
   let drawings = [];   // { type:'rect', x, y, w, h, color, stroke }
+  let blurs = [];       // { type:'blur', x, y, w, h, intensity }
   let steps = [];       // { type:'step', x, y, radius, number, color }
   let cropRegion = null, dragStart = null, isDragging = false;
 
@@ -138,10 +146,55 @@
     }
   }
 
+  /* ── Pixelation blur ─────────────────────── */
+
+  function applyPixelBlur(c, bx, by, bw, bh, intensity, canvasW, canvasH) {
+    // Clamp to canvas bounds
+    const x = Math.max(0, Math.round(bx));
+    const y = Math.max(0, Math.round(by));
+    const w = Math.min(Math.round(bw), canvasW - x);
+    const h = Math.min(Math.round(bh), canvasH - y);
+    if (w < 2 || h < 2) return;
+
+    const blockSize = Math.max(2, Math.round(intensity));
+    const imageData = c.getImageData(x, y, w, h);
+    const data = imageData.data;
+
+    // Pixelate: average each block's color
+    for (let py = 0; py < h; py += blockSize) {
+      for (let px = 0; px < w; px += blockSize) {
+        let r = 0, g = 0, b = 0, a = 0, count = 0;
+        const maxPy = Math.min(py + blockSize, h);
+        const maxPx = Math.min(px + blockSize, w);
+        for (let dy = py; dy < maxPy; dy++) {
+          for (let dx = px; dx < maxPx; dx++) {
+            const i = (dy * w + dx) * 4;
+            r += data[i]; g += data[i + 1]; b += data[i + 2]; a += data[i + 3];
+            count++;
+          }
+        }
+        r = Math.round(r / count); g = Math.round(g / count);
+        b = Math.round(b / count); a = Math.round(a / count);
+        for (let dy = py; dy < maxPy; dy++) {
+          for (let dx = px; dx < maxPx; dx++) {
+            const i = (dy * w + dx) * 4;
+            data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = a;
+          }
+        }
+      }
+    }
+    c.putImageData(imageData, x, y);
+  }
+
   function redraw() {
     if (!img) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    // Apply blur regions using pixelation (works on any canvas)
+    for (const b of blurs) {
+      applyPixelBlur(ctx, b.x, b.y, b.w, b.h, b.intensity, canvas.width, canvas.height);
+    }
 
     for (const d of drawings) {
       ctx.strokeStyle = d.color; ctx.lineWidth = d.stroke; ctx.lineJoin = 'round';
@@ -173,11 +226,15 @@
 
   function updateToolUI() {
     document.getElementById('tool-rect').classList.toggle('active', tool === 'rect');
+    document.getElementById('tool-blur').classList.toggle('active', tool === 'blur');
     document.getElementById('tool-step').classList.toggle('active', tool === 'step');
     document.getElementById('tool-crop').classList.toggle('active', tool === 'crop');
-    const show = tool === 'step';
-    document.getElementById('sep-step-size').style.display = show ? '' : 'none';
-    document.getElementById('step-size-group').style.display = show ? 'flex' : 'none';
+    const showStep = tool === 'step';
+    document.getElementById('sep-step-size').style.display = showStep ? '' : 'none';
+    document.getElementById('step-size-group').style.display = showStep ? 'flex' : 'none';
+    const showBlur = tool === 'blur';
+    document.getElementById('sep-blur-intensity').style.display = showBlur ? '' : 'none';
+    document.getElementById('blur-intensity-group').style.display = showBlur ? 'flex' : 'none';
     canvas.style.cursor = tool === 'step' ? 'copy' : 'crosshair';
   }
 
@@ -186,8 +243,14 @@
   }
 
   document.getElementById('tool-rect').addEventListener('click', () => { tool = 'rect'; cropRegion = null; selectedStep = -1; updateToolUI(); redraw(); });
+  document.getElementById('tool-blur').addEventListener('click', () => { tool = 'blur'; cropRegion = null; selectedStep = -1; updateToolUI(); redraw(); });
   document.getElementById('tool-step').addEventListener('click', () => { tool = 'step'; cropRegion = null; updateToolUI(); updateNextPreview(); redraw(); });
   document.getElementById('tool-crop').addEventListener('click', () => { tool = 'crop'; selectedStep = -1; updateToolUI(); redraw(); });
+
+  // Blur intensity slider label
+  document.getElementById('ed-blur-intensity').addEventListener('input', (e) => {
+    document.getElementById('blur-val').textContent = e.target.value;
+  });
 
   /* ── Step hit-test ───────────────────────── */
 
@@ -300,6 +363,12 @@
       ctx.strokeStyle = document.getElementById('ed-color').value;
       ctx.lineWidth = parseInt(document.getElementById('ed-stroke').value) || 4;
       ctx.strokeRect(rx, ry, rw, rh);
+    } else if (tool === 'blur') {
+      // Preview: draw dashed outline + pixelated preview
+      const intensity = parseInt(document.getElementById('ed-blur-intensity').value) || 16;
+      if (rw > 2 && rh > 2) applyPixelBlur(ctx, rx, ry, rw, rh, intensity, canvas.width, canvas.height);
+      ctx.strokeStyle = '#e05d44'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+      ctx.strokeRect(rx, ry, rw, rh); ctx.setLineDash([]);
     } else if (tool === 'crop') {
       cropRegion = { x: rx, y: ry, w: rw, h: rh }; redraw();
     }
@@ -331,6 +400,10 @@
       if (tool === 'rect') {
         drawings.push({ type: 'rect', x: rx, y: ry, w: rw, h: rh, color: document.getElementById('ed-color').value, stroke: parseInt(document.getElementById('ed-stroke').value) || 4 });
         undoStack.push({ kind: 'rect' });
+      }
+      else if (tool === 'blur') {
+        blurs.push({ type: 'blur', x: rx, y: ry, w: rw, h: rh, intensity: parseInt(document.getElementById('ed-blur-intensity').value) || 16 });
+        undoStack.push({ kind: 'blur' });
       }
       else if (tool === 'crop') { cropRegion = { x: rx, y: ry, w: rw, h: rh }; undoStack.push({ kind: 'crop' }); }
     }
@@ -379,13 +452,14 @@
     if (undoStack.length === 0) return;
     const last = undoStack.pop();
     if (last.kind === 'rect') drawings.pop();
+    else if (last.kind === 'blur') blurs.pop();
     else if (last.kind === 'step') { steps.pop(); selectedStep = -1; renumberSteps(); }
     else if (last.kind === 'crop') cropRegion = null;
     redraw();
   }
 
   document.getElementById('btn-undo').addEventListener('click', performUndo);
-  document.getElementById('btn-clear').addEventListener('click', () => { drawings = []; steps = []; cropRegion = null; undoStack = []; nextStepNumber = 1; selectedStep = -1; updateNextPreview(); redraw(); });
+  document.getElementById('btn-clear').addEventListener('click', () => { drawings = []; blurs = []; steps = []; cropRegion = null; undoStack = []; nextStepNumber = 1; selectedStep = -1; updateNextPreview(); redraw(); });
   document.getElementById('btn-cancel').addEventListener('click', () => window.close());
 
   /* ── Save ─────────────────────────────────── */
@@ -399,6 +473,13 @@
     full.width = sw; full.height = sh;
     const fc = full.getContext('2d');
     fc.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    // Apply blurs at full resolution
+    for (const b of blurs) {
+      const bx = Math.round(b.x * scX) - sx, by = Math.round(b.y * scY) - sy;
+      const bw = Math.round(b.w * scX), bh = Math.round(b.h * scY);
+      applyPixelBlur(fc, bx, by, bw, bh, b.intensity * Math.max(scX, scY), sw, sh);
+    }
 
     for (const d of drawings) {
       fc.strokeStyle = d.color; fc.lineWidth = d.stroke * Math.max(scX, scY); fc.lineJoin = 'round';

@@ -101,6 +101,39 @@
     .step-card .step-desc { font-size: 12px; color: var(--text-secondary); word-break: break-word; line-height: 1.4; }
     .step-card .step-thumb { width: 100%; border-radius: var(--radius-sm); margin-top: 8px; border: 1px solid var(--border); cursor: pointer; transition: var(--transition); }
     .step-card .step-thumb:hover { border-color: var(--spektra); opacity: .9; }
+
+    /* ── Drag & Drop for Step Cards ── */
+    .step-card .drag-handle { cursor: grab; color: var(--text-muted); font-size: 16px; padding: 2px 4px; border-radius: 3px; user-select: none; transition: var(--transition); }
+    .step-card .drag-handle:hover { color: var(--text-primary); background: var(--bg-elevated); }
+    .step-card .drag-handle:active { cursor: grabbing; }
+    .step-card[draggable="true"] { transition: opacity .2s, border-color .2s, transform .15s; }
+    .step-card.dragging { opacity: .4; border: 1px dashed var(--spektra); transform: scale(.97); }
+    .step-card.drag-over { border-color: var(--spektra); box-shadow: 0 0 0 2px rgba(124,58,237,.25); }
+
+    /* ── Undo/Redo Buttons ── */
+    .undo-redo-bar { display: flex; gap: 4px; align-items: center; }
+    .undo-redo-bar button { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); border-radius: var(--radius-sm); width: 30px; height: 28px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+    .undo-redo-bar button:hover:not(:disabled) { background: var(--border); color: var(--text-primary); }
+    .undo-redo-bar button:disabled { opacity: .3; cursor: not-allowed; }
+
+    /* ── Keyboard Shortcuts Badge ── */
+    .kbd { display: inline-block; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 10px; font-family: 'Cascadia Code', Consolas, monospace; color: var(--text-muted); line-height: 1.4; }
+
+    /* ── Version Diff View ── */
+    .diff-container { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-top: 8px; max-height: 400px; }
+    .diff-panel { flex: 1; overflow-y: auto; font-family: 'Cascadia Code', Consolas, monospace; font-size: 11px; line-height: 1.6; background: var(--bg-dark); }
+    .diff-panel:first-child { border-right: 1px solid var(--border); }
+    .diff-panel-header { padding: 6px 10px; background: var(--bg-elevated); font-size: 11px; font-weight: 600; color: var(--text-secondary); position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--border); }
+    .diff-line { padding: 1px 10px; white-space: pre-wrap; word-break: break-all; }
+    .diff-line.added { background: rgba(63,185,80,.12); color: #3fb950; }
+    .diff-line.removed { background: rgba(248,81,73,.12); color: #f85149; }
+    .diff-line.unchanged { color: var(--text-muted); }
+    .diff-panel::-webkit-scrollbar { width: 5px; }
+    .diff-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .diff-selector { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+    .diff-selector select { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; outline: none; }
+    .diff-selector select:focus { border-color: var(--spektra); }
+
     #status-bar { padding: 8px 16px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--bg-dark); }
     #status-bar .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
     #status-bar.error .status-dot { background: var(--danger); }
@@ -136,6 +169,89 @@
     .hidden { display: none !important; }
     .flex-row { display: flex; gap: 6px; }
     .flex-row > * { flex: 1; }
+
+    /* ── AI Chat Box — bottom panel in browser area ──── */
+    #ai-chat-bar {
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-dark); border-top: 1px solid var(--border);
+      padding: 0; flex-shrink: 0;
+    }
+    #ai-chat-toggle {
+      width: 100%; background: none; border: none; color: var(--spektra-accent);
+      font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 14px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background .2s, color .2s;
+    }
+    #ai-chat-toggle:hover { background: var(--bg-elevated); color: var(--spektra); }
+    #ai-chat-toggle.open { color: var(--danger); }
+
+    #ai-chat-panel {
+      display: none; flex-direction: column; flex-shrink: 0;
+      background: var(--bg-panel); border-top: 1px solid var(--spektra);
+      max-height: 300px; overflow: hidden;
+    }
+    #ai-chat-panel.visible { display: flex; }
+
+    #ai-chat-header {
+      padding: 8px 14px; background: linear-gradient(135deg, var(--spektra-dark), var(--spektra));
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #ai-chat-header span { font-size: 13px; font-weight: 600; color: #fff; }
+    #ai-chat-header .chat-close { background: none; border: none; color: rgba(255,255,255,.7); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+    #ai-chat-header .chat-close:hover { color: #fff; background: rgba(255,255,255,.15); }
+    #ai-chat-messages {
+      flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+      min-height: 100px; max-height: 180px;
+    }
+    #ai-chat-messages::-webkit-scrollbar { width: 5px; }
+    #ai-chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .chat-msg { padding: 8px 12px; border-radius: var(--radius); font-size: 12px; line-height: 1.5; max-width: 92%; word-wrap: break-word; }
+    .chat-msg.user { background: var(--spektra); color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .chat-msg.ai { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 2px; }
+    .chat-msg.system { background: transparent; color: var(--text-muted); font-size: 11px; text-align: center; align-self: center; }
+    .chat-msg .thinking { color: var(--text-muted); font-style: italic; }
+
+    /* Proposed change card */
+    .chat-change-card {
+      background: var(--bg-dark); border: 1px solid var(--spektra); border-radius: var(--radius);
+      padding: 10px; margin-top: 8px; font-size: 12px;
+    }
+    .chat-change-card .change-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .chat-change-card .change-label.old { color: var(--danger); }
+    .chat-change-card .change-label.new { color: #3fb950; }
+    .chat-change-card .change-text {
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 6px 8px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 11px;
+      white-space: pre-wrap; word-break: break-word; margin-bottom: 6px; max-height: 80px; overflow-y: auto;
+    }
+    .chat-change-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .chat-change-actions button {
+      flex: 1; padding: 6px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600;
+      cursor: pointer; border: none; transition: all var(--transition);
+    }
+    .chat-change-actions .btn-accept { background: #238636; color: #fff; }
+    .chat-change-actions .btn-accept:hover { background: #2ea043; }
+    .chat-change-actions .btn-reject { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); }
+    .chat-change-actions .btn-reject:hover { background: var(--border); color: var(--text-primary); }
+
+    #ai-chat-input-area {
+      display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border);
+      background: var(--bg-dark); flex-shrink: 0;
+    }
+    #ai-chat-input {
+      flex: 1; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border);
+      border-radius: 16px; padding: 7px 14px; font-size: 12px; font-family: inherit; outline: none;
+      resize: none; min-height: 34px; max-height: 60px;
+    }
+    #ai-chat-input:focus { border-color: var(--spektra); box-shadow: 0 0 0 2px rgba(124,58,237,.2); }
+    #ai-chat-send {
+      width: 34px; height: 34px; border-radius: 50%; background: var(--spektra); color: #fff;
+      border: none; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: background .2s; flex-shrink: 0; align-self: flex-end;
+    }
+    #ai-chat-send:hover { background: var(--spektra-hover); }
+    #ai-chat-send:disabled { background: var(--bg-elevated); color: var(--text-muted); cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -154,6 +270,24 @@
   </div>
   <div id="webview-container">
     <!-- Portal is rendered by WebContentsView overlay positioned here -->
+  </div>
+
+  <!-- AI Chat Box — sits below webview, slides up when toggled -->
+  <div id="ai-chat-bar">
+    <button id="ai-chat-toggle" title="AI Guide Editor">&#9889; AI Guide Editor</button>
+  </div>
+  <div id="ai-chat-panel">
+    <div id="ai-chat-header">
+      <span>&#9889; AI Guide Editor</span>
+      <button class="chat-close" id="ai-chat-close">&#9660;</button>
+    </div>
+    <div id="ai-chat-messages">
+      <div class="chat-msg system">Tell me what changes to make in your guide. I'll show you the proposed edit before applying.</div>
+    </div>
+    <div id="ai-chat-input-area">
+      <textarea id="ai-chat-input" rows="1" placeholder="e.g. Rewrite step 3 to mention clicking Settings..."></textarea>
+      <button id="ai-chat-send" title="Send">&#10148;</button>
+    </div>
   </div>
 </div>
 
@@ -183,12 +317,24 @@
     </div>
     <div id="recording-section" class="section hidden">
       <label>Step Description</label>
-      <textarea id="step-desc" rows="2" placeholder="Describe the action you just performed..."></textarea>
-      <button id="btn-capture" class="btn btn-primary btn-icon">&#128247;&ensp;Capture Step</button>
+      <textarea id="step-desc" rows="2" placeholder="Describe actions (e.g. click on search bar, type vm, click on vm under services)"></textarea>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+        <button id="btn-capture" class="btn btn-primary btn-icon" style="flex:1;margin-top:0;">&#128247;&ensp;Capture Step</button>
+        <div class="undo-redo-bar">
+          <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>&#8630;</button>
+          <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>&#8631;</button>
+        </div>
+      </div>
       <div class="flex-row" style="margin-top:6px;">
         <button id="btn-generate" class="btn btn-secondary btn-icon" disabled>&#9996;&ensp;Generate Guide</button>
         <button id="btn-stop" class="btn btn-danger btn-icon">&#9632;&ensp;Stop</button>
       </div>
+      <p style="font-size:10px;color:var(--text-muted);margin-top:6px;">
+        <span class="kbd">Ctrl+Shift+C</span> Capture &nbsp;
+        <span class="kbd">Ctrl+Shift+G</span> Generate &nbsp;
+        <span class="kbd">Ctrl+Z</span> Undo &nbsp;
+        <span class="kbd">Ctrl+Y</span> Redo
+      </p>
     </div>
     <div id="step-list-container">
       <div class="steps-header">
@@ -222,10 +368,24 @@
 
   <div class="panel-content" id="panel-export">
     <div style="padding:16px;overflow-y:auto;flex:1;">
+      <div class="export-card" style="border:1px dashed var(--spektra);background:rgba(124,58,237,0.05);"><h4>&#128229; Import Guide</h4><p>Load an existing .md guide file to preview, edit, and re-export.</p><button id="btn-import-guide" class="btn btn-primary btn-sm">Import .md File</button></div>
       <div class="export-card"><h4>&#128196; Save Markdown</h4><p>Save the generated guide as a .md file to any location.</p><button id="btn-save-md" class="btn btn-primary btn-sm">Save .md File</button></div>
       <div class="export-card"><h4>&#128193; Open Output Folder</h4><p>Open the guide folder containing markdown and all screenshots.</p><button id="btn-open-folder" class="btn btn-secondary btn-sm">Open in Explorer</button></div>
       <div class="export-card"><h4>&#128230; Export Complete Package</h4><p>Copy the full guide (markdown + screenshots) to a destination folder.</p><button id="btn-export" class="btn btn-secondary btn-sm">Export All</button></div>
       <div class="export-card"><h4>&#128203; Copy to Clipboard</h4><p>Copy the raw markdown to clipboard for pasting elsewhere.</p><button id="btn-copy-md" class="btn btn-secondary btn-sm">Copy Markdown</button></div>
+      <div class="export-card"><h4>&#128462; Export as PDF</h4><p>Export the guide as a styled PDF document for offline sharing.</p><button id="btn-export-pdf" class="btn btn-primary btn-sm">Export PDF</button></div>
+      <div class="export-card" id="version-card"><h4>&#128338; Version History</h4><p>Previous versions are saved automatically before each edit or regeneration.</p><button id="btn-load-versions" class="btn btn-secondary btn-sm">Load Versions</button><div id="version-list" style="margin-top:8px;"></div>
+        <div id="diff-section" class="hidden">
+          <div class="diff-selector">
+            <label style="font-size:11px;color:var(--text-secondary);margin:0;">Compare:</label>
+            <select id="diff-left"><option value="current">Current</option></select>
+            <span style="color:var(--text-muted);font-size:12px;">vs</span>
+            <select id="diff-right"></select>
+            <button id="btn-run-diff" class="btn btn-sm btn-primary" style="padding:3px 10px;font-size:11px;">Diff</button>
+          </div>
+          <div id="diff-output"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -259,6 +419,93 @@
 
   let serverPort = 9005, recording = false, steps = [], capturing = false, lastGuideData = null;
   let initReady = false;
+
+  // ══ Undo/Redo System ═══════════════════════════════════════════════
+  const undoStack = [], redoStack = [];
+  const btnUndo = document.getElementById('btn-undo');
+  const btnRedo = document.getElementById('btn-redo');
+
+  function pushUndo(action) {
+    undoStack.push(action);
+    redoStack.length = 0; // clear redo on new action
+    updateUndoRedoUI();
+  }
+  function updateUndoRedoUI() {
+    btnUndo.disabled = undoStack.length === 0;
+    btnRedo.disabled = redoStack.length === 0;
+  }
+  async function performUndo() {
+    if (undoStack.length === 0) return;
+    const action = undoStack.pop();
+    try {
+      if (action.type === 'capture') {
+        // Undo capture = delete the step
+        const resp = await fetch(apiUrl('/api/session/step/' + action.step.stepNumber), { method: 'DELETE' });
+        if (resp.ok) {
+          const card = stepList.querySelector('[data-num="' + action.step.stepNumber + '"]');
+          if (card) card.remove();
+          steps = steps.filter(s => s.stepNumber !== action.step.stepNumber);
+          stepCount.textContent = String(steps.length);
+          if (steps.length === 0) btnGenerate.disabled = true;
+          redoStack.push(action);
+          setStatus('Undo: removed step ' + action.step.stepNumber, 'success');
+        }
+      } else if (action.type === 'delete') {
+        // Undo delete = re-capture the step (re-add to UI, server already has it removed so we just re-add visually)
+        steps.push(action.step);
+        steps.sort((a, b) => a.stepNumber - b.stepNumber);
+        rebuildStepList();
+        btnGenerate.disabled = false;
+        redoStack.push(action);
+        setStatus('Undo: restored step ' + action.step.stepNumber, 'success');
+      } else if (action.type === 'reorder') {
+        steps = action.oldSteps.map(s => ({...s}));
+        rebuildStepList();
+        redoStack.push(action);
+        setStatus('Undo: reverted step order', 'success');
+      }
+    } catch (err) { setStatus('Undo failed: ' + err.message, 'error'); }
+    updateUndoRedoUI();
+  }
+  async function performRedo() {
+    if (redoStack.length === 0) return;
+    const action = redoStack.pop();
+    try {
+      if (action.type === 'capture') {
+        steps.push(action.step);
+        steps.sort((a, b) => a.stepNumber - b.stepNumber);
+        rebuildStepList();
+        btnGenerate.disabled = false;
+        undoStack.push(action);
+        setStatus('Redo: restored step ' + action.step.stepNumber, 'success');
+      } else if (action.type === 'delete') {
+        const resp = await fetch(apiUrl('/api/session/step/' + action.step.stepNumber), { method: 'DELETE' });
+        if (resp.ok) {
+          const card = stepList.querySelector('[data-num="' + action.step.stepNumber + '"]');
+          if (card) card.remove();
+          steps = steps.filter(s => s.stepNumber !== action.step.stepNumber);
+          stepCount.textContent = String(steps.length);
+          if (steps.length === 0) btnGenerate.disabled = true;
+          undoStack.push(action);
+          setStatus('Redo: removed step ' + action.step.stepNumber, 'success');
+        }
+      } else if (action.type === 'reorder') {
+        steps = action.newSteps.map(s => ({...s}));
+        rebuildStepList();
+        undoStack.push(action);
+        setStatus('Redo: reapplied step order', 'success');
+      }
+    } catch (err) { setStatus('Redo failed: ' + err.message, 'error'); }
+    updateUndoRedoUI();
+  }
+  btnUndo.addEventListener('click', performUndo);
+  btnRedo.addEventListener('click', performRedo);
+
+  function rebuildStepList() {
+    stepList.innerHTML = '';
+    steps.forEach(s => renderStep(s));
+    stepCount.textContent = String(steps.length);
+  }
 
   function setStatus(msg, type) { statusText.textContent = msg; statusBar.className = type || ''; console.log('[Studio] Status:', msg, type || ''); }
   function apiUrl(path) { return 'http://localhost:' + serverPort + path; }
@@ -493,6 +740,35 @@
   }
   init();
 
+  // ══ Keyboard Shortcuts ═══════════════════════════════════════════════
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+C → Capture Step
+    if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+      e.preventDefault();
+      if (recording && !capturing) btnCapture.click();
+    }
+    // Ctrl+Shift+G → Generate Guide
+    if (e.ctrlKey && e.shiftKey && e.key === 'G') {
+      e.preventDefault();
+      if (recording && !btnGenerate.disabled) btnGenerate.click();
+    }
+    // Ctrl+Z → Undo (only when not focused in text inputs)
+    if (e.ctrlKey && !e.shiftKey && e.key === 'z' && !isTextFocused()) {
+      e.preventDefault();
+      performUndo();
+    }
+    // Ctrl+Y → Redo (only when not focused in text inputs)
+    if (e.ctrlKey && e.key === 'y' && !isTextFocused()) {
+      e.preventDefault();
+      performRedo();
+    }
+  });
+
+  function isTextFocused() {
+    const el = document.activeElement;
+    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  }
+
   // Start recording
   btnStart.addEventListener('click', async () => {
     console.log('[Studio] Start Recording clicked');
@@ -524,14 +800,18 @@
     if (capturing) return; capturing = true; btnCapture.disabled = true;
     setStatus('Capturing screenshot' + (bastionActive ? ' from Bastion' : '') + '...', 'warning');
     try {
+      // Get click data BEFORE screenshot (so we know what was clicked)
+      const clickData = await window.electronAPI.getClickData();
       const base64 = await window.electronAPI.captureScreenshot();
       if (!base64) throw new Error('Screenshot capture returned empty');
       const pageInfo = await window.electronAPI.getWebviewInfo();
       const desc = stepDesc.value.trim() || 'Step ' + (steps.length + 1);
+      const clickBox = clickData ? { x: clickData.x, y: clickData.y, width: clickData.width, height: clickData.height, text: clickData.text || '', tag: clickData.tag || '', ariaLabel: clickData.ariaLabel || '', role: clickData.role || '', id: clickData.id || '', placeholder: clickData.placeholder || '' } : null;
       const resp = await fetch(apiUrl('/api/desktop/capture'), { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ screenshot: base64, description: desc, clickBox: null, pageUrl: pageInfo.url, pageTitle: pageInfo.title, dpr: 1 }) });
+        body: JSON.stringify({ screenshot: base64, description: desc, clickBox, pageUrl: pageInfo.url, pageTitle: pageInfo.title, dpr: 1 }) });
       if (!resp.ok) throw new Error((await resp.json()).error || 'Capture failed');
       const step = await resp.json(); steps.push(step);
+      pushUndo({ type: 'capture', step });
       renderStep(step); stepCount.textContent = String(steps.length); stepDesc.value = ''; btnGenerate.disabled = false;
       setStatus('Step ' + step.stepNumber + ' captured!', 'success');
     } catch (err) { setStatus('Capture error: ' + err.message, 'error'); }
@@ -540,18 +820,54 @@
 
   function renderStep(step) {
     const card = document.createElement('div'); card.className = 'step-card'; card.dataset.num = step.stepNumber;
-    card.innerHTML = '<div class="step-top"><span class="step-num">Step ' + step.stepNumber + '</span><div class="step-actions">'
+    card.draggable = true;
+    card.innerHTML = '<div class="step-top"><span class="drag-handle" title="Drag to reorder">&#9776;</span><span class="step-num">Step ' + step.stepNumber + '</span><div class="step-actions">'
       + '<button class="step-action-btn danger" title="Delete" data-action="delete">&times;</button></div></div>'
       + '<div class="step-desc">' + escapeHtml(step.description) + '</div>'
       + '<img class="step-thumb" src="' + apiUrl('/' + step.screenshotRelative) + '?t=' + Date.now() + '" alt="Step ' + step.stepNumber + '">';
     card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteStep(step.stepNumber, card));
     card.querySelector('.step-thumb').addEventListener('click', () => openEditor(step));
+
+    // Drag & Drop events
+    card.addEventListener('dragstart', (e) => {
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', step.stepNumber.toString());
+    });
+    card.addEventListener('dragend', () => { card.classList.remove('dragging'); clearDragOver(); });
+    card.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => { card.classList.remove('drag-over'); });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault(); clearDragOver();
+      const fromNum = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      const toNum = step.stepNumber;
+      if (fromNum !== toNum) reorderSteps(fromNum, toNum);
+    });
+
     stepList.appendChild(card); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  function clearDragOver() { stepList.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); }
+
+  function reorderSteps(fromNum, toNum) {
+    const oldSteps = steps.map(s => ({...s}));
+    const fromIdx = steps.findIndex(s => s.stepNumber === fromNum);
+    const toIdx = steps.findIndex(s => s.stepNumber === toNum);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const [moved] = steps.splice(fromIdx, 1);
+    steps.splice(toIdx, 0, moved);
+    // Renumber
+    steps.forEach((s, i) => { s.stepNumber = i + 1; });
+    const newSteps = steps.map(s => ({...s}));
+    pushUndo({ type: 'reorder', oldSteps, newSteps });
+    rebuildStepList();
+    setStatus('Steps reordered!', 'success');
+  }
+
   async function deleteStep(num, card) {
+    const step = steps.find(s => s.stepNumber === num);
     try { const resp = await fetch(apiUrl('/api/session/step/' + num), { method: 'DELETE' });
-      if (resp.ok) { card.remove(); steps = steps.filter(s => s.stepNumber !== num); stepCount.textContent = String(steps.length); if (steps.length === 0) btnGenerate.disabled = true; setStatus('Step ' + num + ' deleted.'); }
+      if (resp.ok) { card.remove(); steps = steps.filter(s => s.stepNumber !== num); stepCount.textContent = String(steps.length); if (steps.length === 0) btnGenerate.disabled = true; if (step) pushUndo({ type: 'delete', step }); setStatus('Step ' + num + ' deleted.'); }
     } catch (err) { setStatus('Delete error: ' + err.message, 'error'); }
   }
 
@@ -606,14 +922,27 @@
   }
 
   // Export actions
+  document.getElementById('btn-import-guide').addEventListener('click', async () => {
+    const result = await window.electronAPI.importGuide();
+    if (!result) return;
+    lastGuideData = { markdown: result.markdown, guideDir: result.guideDir };
+    renderMarkdownPreview(result.markdown);
+    mdSource.textContent = result.markdown;
+    document.querySelector('.panel-tab[data-panel="preview"]').click();
+    setStatus('Imported: ' + result.filePath.split(/[\\/]/).pop(), 'success');
+  });
   document.getElementById('btn-save-md').addEventListener('click', async () => {
     if (!lastGuideData) { setStatus('Generate a guide first.', 'error'); return; }
     const saved = await window.electronAPI.saveGuide({ markdown: lastGuideData.markdown || lastGuideData.guide, defaultName: 'guide.md' });
     if (saved) setStatus('Saved to: ' + saved, 'success');
   });
   document.getElementById('btn-open-folder').addEventListener('click', async () => {
-    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder available.', 'error'); return; }
-    await window.electronAPI.openFolder(lastGuideData.guideDir);
+    if (lastGuideData && lastGuideData.guideDir) {
+      await window.electronAPI.openFolder(lastGuideData.guideDir);
+    } else {
+      // Fallback: open the output directory
+      await window.electronAPI.openFolder('output');
+    }
   });
   document.getElementById('btn-export').addEventListener('click', async () => {
     if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder available.', 'error'); return; }
@@ -625,11 +954,140 @@
     navigator.clipboard.writeText(lastGuideData.markdown || lastGuideData.guide || '').then(() => setStatus('Copied to clipboard!', 'success'));
   });
 
+  // Version history
+  document.getElementById('btn-load-versions').addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder available.', 'error'); return; }
+    const versions = await window.electronAPI.listGuideVersions({ guideDir: lastGuideData.guideDir });
+    const list = document.getElementById('version-list');
+    const diffSection = document.getElementById('diff-section');
+    if (!versions || versions.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-muted);font-size:12px;margin:4px 0;">No previous versions found.</p>';
+      diffSection.classList.add('hidden');
+      return;
+    }
+    list.innerHTML = versions.map(v =>
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:12px;color:var(--text-secondary);">v' + v.version + '</span>' +
+      '<button class="btn btn-sm btn-secondary" style="font-size:11px;padding:2px 8px;" data-restore="' + v.version + '">Restore</button></div>'
+    ).join('');
+    list.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const ver = parseInt(btn.dataset.restore, 10);
+        if (!confirm('Restore version v' + ver + '? Current guide will be versioned first.')) return;
+        const content = await window.electronAPI.restoreGuideVersion({ guideDir: lastGuideData.guideDir, version: ver });
+        if (content) {
+          if (lastGuideData.markdown !== undefined) lastGuideData.markdown = content;
+          else lastGuideData.guide = content;
+          renderMarkdownPreview(content); mdSource.textContent = content;
+          document.querySelector('.panel-tab[data-panel="preview"]').click();
+          setStatus('Restored version v' + ver + '!', 'success');
+        } else { setStatus('Failed to restore version.', 'error'); }
+      });
+    });
+
+    // Populate diff selectors
+    diffSection.classList.remove('hidden');
+    const leftSel = document.getElementById('diff-left');
+    const rightSel = document.getElementById('diff-right');
+    leftSel.innerHTML = '<option value="current">Current</option>' + versions.map(v => '<option value="' + v.version + '">v' + v.version + '</option>').join('');
+    rightSel.innerHTML = versions.map(v => '<option value="' + v.version + '">v' + v.version + '</option>').join('');
+  });
+
+  // ══ Version Diff ═══════════════════════════════════════════════════════
+  document.getElementById('btn-run-diff').addEventListener('click', async () => {
+    if (!lastGuideData || !lastGuideData.guideDir) { setStatus('No guide folder.', 'error'); return; }
+    const leftVal = document.getElementById('diff-left').value;
+    const rightVal = document.getElementById('diff-right').value;
+    if (leftVal === rightVal) { setStatus('Select two different versions to compare.', 'warning'); return; }
+
+    let leftText, rightText, leftLabel, rightLabel;
+    if (leftVal === 'current') {
+      leftText = lastGuideData.markdown || lastGuideData.guide || '';
+      leftLabel = 'Current';
+    } else {
+      leftText = await window.electronAPI.readGuideVersion({ guideDir: lastGuideData.guideDir, version: parseInt(leftVal, 10) });
+      leftLabel = 'v' + leftVal;
+    }
+    if (rightVal === 'current') {
+      rightText = lastGuideData.markdown || lastGuideData.guide || '';
+      rightLabel = 'Current';
+    } else {
+      rightText = await window.electronAPI.readGuideVersion({ guideDir: lastGuideData.guideDir, version: parseInt(rightVal, 10) });
+      rightLabel = 'v' + rightVal;
+    }
+    if (!leftText || !rightText) { setStatus('Could not read version content.', 'error'); return; }
+
+    renderDiff(leftText, rightText, leftLabel, rightLabel);
+  });
+
+  function renderDiff(leftText, rightText, leftLabel, rightLabel) {
+    const leftLines = leftText.split('\n');
+    const rightLines = rightText.split('\n');
+    // Simple LCS-based line diff
+    const lcs = computeLCS(leftLines, rightLines);
+    let li = 0, ri = 0, ci = 0;
+    const leftHtml = [], rightHtml = [];
+    while (li < leftLines.length || ri < rightLines.length) {
+      if (ci < lcs.length && li < leftLines.length && ri < rightLines.length && leftLines[li] === lcs[ci] && rightLines[ri] === lcs[ci]) {
+        leftHtml.push('<div class="diff-line unchanged">' + escapeHtml(leftLines[li]) + '</div>');
+        rightHtml.push('<div class="diff-line unchanged">' + escapeHtml(rightLines[ri]) + '</div>');
+        li++; ri++; ci++;
+      } else {
+        if (li < leftLines.length && (ci >= lcs.length || leftLines[li] !== lcs[ci])) {
+          leftHtml.push('<div class="diff-line removed">' + escapeHtml(leftLines[li]) + '</div>');
+          rightHtml.push('<div class="diff-line" style="opacity:.3;">&nbsp;</div>');
+          li++;
+        } else if (ri < rightLines.length && (ci >= lcs.length || rightLines[ri] !== lcs[ci])) {
+          leftHtml.push('<div class="diff-line" style="opacity:.3;">&nbsp;</div>');
+          rightHtml.push('<div class="diff-line added">' + escapeHtml(rightLines[ri]) + '</div>');
+          ri++;
+        }
+      }
+    }
+    document.getElementById('diff-output').innerHTML =
+      '<div class="diff-container">' +
+      '<div class="diff-panel"><div class="diff-panel-header">' + escapeHtml(leftLabel) + '</div>' + leftHtml.join('') + '</div>' +
+      '<div class="diff-panel"><div class="diff-panel-header">' + escapeHtml(rightLabel) + '</div>' + rightHtml.join('') + '</div>' +
+      '</div>';
+  }
+
+  function computeLCS(a, b) {
+    const m = a.length, n = b.length;
+    // Optimize for very large files — limit to 500 lines each
+    const am = a.slice(0, 500), bm = b.slice(0, 500);
+    const mm = am.length, nn = bm.length;
+    const dp = Array.from({ length: mm + 1 }, () => new Uint16Array(nn + 1));
+    for (let i = 1; i <= mm; i++) {
+      for (let j = 1; j <= nn; j++) {
+        dp[i][j] = am[i - 1] === bm[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+    const result = [];
+    let i = mm, j = nn;
+    while (i > 0 && j > 0) {
+      if (am[i - 1] === bm[j - 1]) { result.unshift(am[i - 1]); i--; j--; }
+      else if (dp[i - 1][j] > dp[i][j - 1]) i--;
+      else j--;
+    }
+    return result;
+  }
+
+  // ══ PDF Export ═══════════════════════════════════════════════════════
+  document.getElementById('btn-export-pdf').addEventListener('click', async () => {
+    if (!lastGuideData) { setStatus('Generate a guide first.', 'error'); return; }
+    setStatus('Generating PDF...', 'warning');
+    const md = lastGuideData.markdown || lastGuideData.guide || '';
+    const result = await window.electronAPI.exportPDF({ markdown: md, guideDir: lastGuideData.guideDir || null });
+    if (result) setStatus('PDF saved to: ' + result, 'success');
+    else setStatus('PDF export cancelled or failed.', 'error');
+  });
+
   // Stop & reset
   btnStop.addEventListener('click', async () => {
     if (!confirm('Stop recording and discard all steps?')) return;
     try { await fetch(apiUrl('/api/session/cancel'), { method: 'POST' }); } catch {}
     recording = false; steps = []; stepList.innerHTML = ''; stepCount.textContent = '0';
+    undoStack.length = 0; redoStack.length = 0; updateUndoRedoUI();
     recordingSection.classList.add('hidden'); setupSection.classList.remove('hidden');
     navigateWebview('about:blank'); setStatus('Ready');
   });
@@ -665,6 +1123,150 @@
   });
 
   console.log('[Studio] All event listeners attached successfully.');
+
+  // ══ AI Chat Box ═══════════════════════════════════════════════════════
+  const chatToggle = document.getElementById('ai-chat-toggle');
+  const chatPanel = document.getElementById('ai-chat-panel');
+  const chatClose = document.getElementById('ai-chat-close');
+  const chatMessages = document.getElementById('ai-chat-messages');
+  const chatInput = document.getElementById('ai-chat-input');
+  const chatSend = document.getElementById('ai-chat-send');
+  let chatBusy = false;
+
+  function toggleChat() {
+    const open = chatPanel.classList.toggle('visible');
+    chatToggle.classList.toggle('open', open);
+    chatToggle.innerHTML = open ? '&#9660; Close AI Editor' : '&#9889; AI Guide Editor';
+    if (open) chatInput.focus();
+  }
+  chatToggle.addEventListener('click', toggleChat);
+  chatClose.addEventListener('click', toggleChat);
+
+  function addChatMsg(text, role) {
+    const el = document.createElement('div');
+    el.className = 'chat-msg ' + role;
+    el.textContent = text;
+    chatMessages.appendChild(el);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return el;
+  }
+
+  function addChangeCard(change, idx, explanation) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-msg ai';
+    let html = '';
+    if (explanation && idx === 0) {
+      html += '<div style="margin-bottom:8px;">' + escapeHtml(explanation) + '</div>';
+    }
+    html += '<div class="chat-change-card">'
+      + '<div class="change-label old">Current text:</div>'
+      + '<div class="change-text">' + escapeHtml(change.oldText) + '</div>'
+      + '<div class="change-label new">Proposed replacement:</div>'
+      + '<div class="change-text">' + escapeHtml(change.newText) + '</div>'
+      + '<div class="chat-change-actions">'
+      + '<button class="btn-accept" data-idx="' + idx + '">&#10004; Accept</button>'
+      + '<button class="btn-reject" data-idx="' + idx + '">&#10008; Reject</button>'
+      + '</div></div>';
+    wrapper.innerHTML = html;
+
+    const acceptBtn = wrapper.querySelector('.btn-accept');
+    const rejectBtn = wrapper.querySelector('.btn-reject');
+
+    acceptBtn.addEventListener('click', () => {
+      applyChange(change);
+      acceptBtn.textContent = '\u2713 Applied';
+      acceptBtn.disabled = true;
+      rejectBtn.disabled = true;
+      acceptBtn.style.background = 'var(--text-muted)';
+      addChatMsg('Change applied successfully!', 'system');
+    });
+    rejectBtn.addEventListener('click', () => {
+      rejectBtn.textContent = 'Rejected';
+      rejectBtn.disabled = true;
+      acceptBtn.disabled = true;
+      rejectBtn.style.opacity = '.5';
+      addChatMsg('Change rejected.', 'system');
+    });
+
+    chatMessages.appendChild(wrapper);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function applyChange(change) {
+    if (!lastGuideData) return;
+    let md = lastGuideData.markdown || lastGuideData.guide || '';
+    const idx = md.indexOf(change.oldText);
+    if (idx === -1) {
+      addChatMsg('Warning: Could not find the exact text in the guide. The guide may have been modified since the suggestion was made.', 'system');
+      return;
+    }
+    md = md.substring(0, idx) + change.newText + md.substring(idx + change.oldText.length);
+    // Update stored markdown
+    if (lastGuideData.markdown !== undefined) lastGuideData.markdown = md;
+    else lastGuideData.guide = md;
+    // Re-render preview
+    renderMarkdownPreview(md);
+    mdSource.textContent = md;
+    // Save to disk if possible
+    if (lastGuideData.guideDir) {
+      window.electronAPI.saveGuideToDir({ guideDir: lastGuideData.guideDir, markdown: md })
+        .then(ok => { if (ok) setStatus('Guide updated via AI chat!', 'success'); });
+    }
+  }
+
+  async function sendChatMessage() {
+    const msg = chatInput.value.trim();
+    if (!msg || chatBusy) return;
+    if (!lastGuideData) {
+      addChatMsg('Please generate a guide first before requesting edits.', 'system');
+      return;
+    }
+    addChatMsg(msg, 'user');
+    chatInput.value = '';
+    chatInput.style.height = '34px';
+    chatBusy = true;
+    chatSend.disabled = true;
+
+    const thinkingEl = addChatMsg('Thinking...', 'ai');
+    thinkingEl.innerHTML = '<span class="thinking">Analyzing your request...</span>';
+
+    try {
+      const md = lastGuideData.markdown || lastGuideData.guide || '';
+      const resp = await fetch(apiUrl('/api/chat/edit'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, markdown: md }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || 'Request failed');
+      }
+      const data = await resp.json();
+      thinkingEl.remove();
+
+      if (!data.changes || data.changes.length === 0) {
+        addChatMsg(data.explanation || 'No changes needed for that request.', 'ai');
+      } else {
+        data.changes.forEach((change, i) => addChangeCard(change, i, data.explanation));
+      }
+    } catch (err) {
+      thinkingEl.remove();
+      addChatMsg('Error: ' + err.message, 'system');
+    } finally {
+      chatBusy = false;
+      chatSend.disabled = false;
+    }
+  }
+
+  chatSend.addEventListener('click', sendChatMessage);
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  });
+  // Auto-resize textarea
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = '34px';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 60) + 'px';
+  });
 })();
 </script>
 </body>

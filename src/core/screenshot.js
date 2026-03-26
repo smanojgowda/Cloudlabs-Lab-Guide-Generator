@@ -106,7 +106,7 @@ export async function captureAndProcess(page, annotations, filename) {
   // 7. Optimize and save
   const outputPath = resolve(config.paths.screenshots, filename);
   const finalBuffer = await image
-    .png({ quality: config.screenshot.quality, compressionLevel: 6 })
+    .png({ quality: config.screenshot.quality, compressionLevel: 2 })
     .toBuffer();
 
   writeFileSync(outputPath, finalBuffer);
@@ -203,7 +203,7 @@ export async function annotateBuffer(rawBuffer, annotations, filename) {
   }
 
   const outputPath = resolve(config.paths.screenshots, filename);
-  const finalBuffer = await image.png({ compressionLevel: 6 }).toBuffer();
+  const finalBuffer = await image.png({ compressionLevel: 2 }).toBuffer();
   writeFileSync(outputPath, finalBuffer);
 
   const finalMeta = await sharp(finalBuffer).metadata();

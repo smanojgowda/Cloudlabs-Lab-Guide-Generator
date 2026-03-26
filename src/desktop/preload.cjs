@@ -31,6 +31,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Save edited guide markdown back to guide dir
   saveGuideToDir: (opts) => ipcRenderer.invoke('save-guide-to-dir', opts),
+
+  // Guide versioning
+  listGuideVersions: (opts) => ipcRenderer.invoke('list-guide-versions', opts),
+  restoreGuideVersion: (opts) => ipcRenderer.invoke('restore-guide-version', opts),
+  readGuideVersion: (opts) => ipcRenderer.invoke('read-guide-version', opts),
+
+  // PDF export
+  exportPDF: (opts) => ipcRenderer.invoke('export-pdf', opts),
+
+  // Import an existing .md guide file
+  importGuide: () => ipcRenderer.invoke('import-guide'),
 });
 
 // Portal events — main process → renderer (via window events, safe with contextIsolation)

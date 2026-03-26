@@ -6,9 +6,9 @@
  * Starts the Express server internally, captures screenshots via IPC.
  */
 import { app, BrowserWindow, WebContentsView, ipcMain, dialog, shell, session } from 'electron';
-import { dirname, join } from 'path';
+import { dirname, join, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, writeFileSync, cpSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, cpSync, existsSync, readdirSync, mkdirSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -276,6 +276,21 @@ ipcMain.handle('inject-click-tracker', async () => {
   try {
     await wc.executeJavaScript(`
       if (!window.__lastClickedElements) {
+        window.__buildCssSelector = function(el) {
+          const tag = el.tagName.toLowerCase();
+          const aria = el.getAttribute('aria-label');
+          if (aria) return tag + '[aria-label="' + aria.replace(/"/g, '\\"') + '"]';
+          const testId = el.getAttribute('data-testid');
+          if (testId) return tag + '[data-testid="' + testId + '"]';
+          if (el.id) return '#' + el.id;
+          const role = el.getAttribute('role');
+          const text = (el.textContent || '').trim().slice(0, 50);
+          if (role && text) return tag + '[role="' + role + '"]';
+          if (el.name) return tag + '[name="' + el.name + '"]';
+          const cls = Array.from(el.classList || []).filter(c => !c.match(/^(x-|_|ember)/)).slice(0, 3).join('.');
+          if (cls) return tag + '.' + cls;
+          return tag;
+        };
         window.__lastClickedElements = [];
         document.addEventListener('click', (e) => {
           const el = e.target.closest(
@@ -285,10 +300,23 @@ ipcMain.handle('inject-click-tracker', async () => {
           ) || e.target;
           const rect = el.getBoundingClientRect();
           if (rect.width > 0 && rect.height > 0) {
+            const parentEl = el.parentElement;
             window.__lastClickedElements.push({
               x: rect.x, y: rect.y, width: rect.width, height: rect.height,
               tag: el.tagName.toLowerCase(),
-              text: (el.textContent || '').trim().slice(0, 100),
+              text: (el.textContent || '').trim().slice(0, 120),
+              ariaLabel: el.getAttribute('aria-label') || '',
+              role: el.getAttribute('role') || '',
+              id: el.id || '',
+              placeholder: el.getAttribute('placeholder') || '',
+              className: (el.className || '').toString().slice(0, 200),
+              href: el.getAttribute('href') || '',
+              title: el.getAttribute('title') || '',
+              name: el.getAttribute('name') || '',
+              dataTestId: el.getAttribute('data-testid') || '',
+              type: el.getAttribute('type') || '',
+              cssSelector: window.__buildCssSelector(el),
+              parentText: parentEl ? (parentEl.textContent || '').trim().slice(0, 80) : '',
             });
             if (window.__lastClickedElements.length > 10) window.__lastClickedElements.shift();
           }
@@ -324,8 +352,33 @@ ipcMain.handle('get-device-pixel-ratio', async () => {
 
 // Open folder
 ipcMain.handle('open-folder', async (_, folderPath) => {
-  if (folderPath && existsSync(folderPath)) { shell.openPath(folderPath); return true; }
+  if (!folderPath) return false;
+  // Resolve relative paths against project root
+  const resolved = isAbsolute(folderPath) ? folderPath : join(__dirname, folderPath);
+  if (existsSync(resolved)) { shell.openPath(resolved); return true; }
   return false;
+});
+
+// Import guide
+ipcMain.handle('import-guide', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Lab Guide',
+    filters: [
+      { name: 'Markdown', extensions: ['md'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  try {
+    const filePath = result.filePaths[0];
+    const markdown = readFileSync(filePath, 'utf-8');
+    const guideDir = dirname(filePath);
+    return { markdown, filePath, guideDir };
+  } catch (err) {
+    console.error('[Import] Failed to read guide:', err.message);
+    return null;
+  }
 });
 
 // Save guide
@@ -350,10 +403,27 @@ ipcMain.handle('export-guide-folder', async (_, { guideDir }) => {
   return dest;
 });
 
+// Version the current guide.md before overwriting
+function versionGuideFile(guideDir) {
+  const guidePath = join(guideDir, 'guide.md');
+  if (!existsSync(guidePath)) return 0;
+  const versionsDir = join(guideDir, 'versions');
+  if (!existsSync(versionsDir)) mkdirSync(versionsDir, { recursive: true });
+  const existing = readdirSync(versionsDir).filter(f => /^guide\.v\d+\.md$/.test(f));
+  const nums = existing.map(f => parseInt(f.match(/\.v(\d+)\./)[1], 10));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  const content = readFileSync(guidePath, 'utf-8');
+  writeFileSync(join(versionsDir, `guide.v${next}.md`), content, 'utf-8');
+  console.log(`[Guide] Versioned: v${next}`);
+  return next;
+}
+
 // Save edited guide markdown back to the output guide.md
 ipcMain.handle('save-guide-to-dir', async (_, { guideDir, markdown }) => {
   if (!guideDir || !markdown) return false;
   try {
+    // Version before overwriting
+    versionGuideFile(guideDir);
     const guidePath = join(guideDir, 'guide.md');
     writeFileSync(guidePath, markdown, 'utf-8');
     console.log('[Guide] Saved edited guide to:', guidePath);
@@ -361,6 +431,103 @@ ipcMain.handle('save-guide-to-dir', async (_, { guideDir, markdown }) => {
   } catch (err) {
     console.error('[Guide] Save failed:', err.message);
     return false;
+  }
+});
+
+// List all versions of a guide
+ipcMain.handle('list-guide-versions', async (_, { guideDir }) => {
+  if (!guideDir) return [];
+  const versionsDir = join(guideDir, 'versions');
+  if (!existsSync(versionsDir)) return [];
+  return readdirSync(versionsDir)
+    .filter(f => /^guide\.v\d+\.md$/.test(f))
+    .map(f => ({ version: parseInt(f.match(/\.v(\d+)\./)[1], 10), filename: f }))
+    .sort((a, b) => b.version - a.version);
+});
+
+// Restore a specific version
+ipcMain.handle('restore-guide-version', async (_, { guideDir, version }) => {
+  if (!guideDir || !version) return null;
+  const versionPath = join(guideDir, 'versions', `guide.v${version}.md`);
+  if (!existsSync(versionPath)) return null;
+  // Version current before restoring
+  versionGuideFile(guideDir);
+  const content = readFileSync(versionPath, 'utf-8');
+  writeFileSync(join(guideDir, 'guide.md'), content, 'utf-8');
+  console.log(`[Guide] Restored from v${version}`);
+  return content;
+});
+
+// Read a specific guide version's content (for diff)
+ipcMain.handle('read-guide-version', async (_, { guideDir, version }) => {
+  if (!guideDir || !version) return null;
+  const versionPath = join(guideDir, 'versions', `guide.v${version}.md`);
+  if (!existsSync(versionPath)) return null;
+  return readFileSync(versionPath, 'utf-8');
+});
+
+// Export guide as PDF
+ipcMain.handle('export-pdf', async (_, { markdown, guideDir }) => {
+  if (!markdown) return null;
+
+  // Convert markdown to styled HTML for PDF rendering
+  let html = markdown
+    .replace(/```([\s\S]*?)```/g, '<pre style="background:#f6f8fa;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;"><code>$1</code></pre>')
+    .replace(/^#### (.+)$/gm, '<h4 style="font-size:14px;margin:12px 0 4px;">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:16px;margin:14px 0 6px;">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="font-size:18px;margin:16px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px;">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="font-size:22px;margin:18px 0 10px;border-bottom:2px solid #7c3aed;padding-bottom:6px;color:#7c3aed;">$1</h1>')
+    .replace(/`([^`]+)`/g, '<code style="background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px;">$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^> (.+)$/gm, '<blockquote style="border-left:3px solid #7c3aed;padding:8px 14px;margin:8px 0;background:#f8f6ff;">$1</blockquote>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+
+  // Handle screenshot images — convert relative paths to file:// URIs
+  if (guideDir) {
+    html = html.replace(/!\[([^\]]*)\]\(screenshots\/([^)]+)\)/g, (_, alt, filename) => {
+      const imgPath = join(guideDir, 'screenshots', filename).replace(/\\/g, '/');
+      return '<img src="file:///' + imgPath + '" alt="' + alt + '" style="max-width:100%;border:1px solid #ddd;border-radius:4px;margin:8px 0;">';
+    });
+  }
+
+  const fullHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    'body{font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.7;color:#24292f;max-width:800px;margin:0 auto;padding:30px 40px;}' +
+    'img{max-width:100%;border:1px solid #ddd;border-radius:4px;margin:8px 0;}' +
+    'table{width:100%;border-collapse:collapse;margin:8px 0;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;font-size:12px;}th{background:#f6f8fa;font-weight:600;}' +
+    'ul,ol{padding-left:22px;margin:6px 0;}li{margin:4px 0;}' +
+    '</style></head><body><p>' + html + '</p></body></html>';
+
+  // Create hidden window and print to PDF
+  const pdfWin = new BrowserWindow({ show: false, width: 900, height: 1200, webPreferences: { offscreen: true } });
+  try {
+    await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(fullHtml));
+    // Brief wait for images to load
+    await new Promise(r => setTimeout(r, 1500));
+    const pdfData = await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: false,
+      landscape: false,
+      margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 }
+    });
+
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save PDF',
+      defaultPath: 'guide.pdf',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    });
+    if (canceled || !filePath) return null;
+    writeFileSync(filePath, pdfData);
+    console.log('[PDF] Exported to:', filePath);
+    return filePath;
+  } catch (err) {
+    console.error('[PDF] Export failed:', err.message);
+    return null;
+  } finally {
+    pdfWin.destroy();
   }
 });
 

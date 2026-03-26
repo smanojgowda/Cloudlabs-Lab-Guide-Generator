@@ -10,10 +10,11 @@ import config from './config.js';
 import logger from './utils/logger.js';
 import {
   startSession, recordStep, stopAndGenerate, getSessionStatus,
-  closeBrowser, removeStep, editStep, inspectElement, cancelSession,
+  closeBrowser, removeStep, editStep, cancelSession,
   addCapturedStep,
 } from './agent/orchestrator.js';
 import { getSteps } from './core/recorder.js';
+import { proposeGuideEdit } from './services/llm.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -196,14 +197,6 @@ app.post('/api/desktop/edit-screenshot', (req, res) => {
 });
 
 /**
- * POST /api/close — Close browser
- */
-app.post('/api/close', async (req, res) => {
-  await closeBrowser();
-  res.json({ status: 'browser closed' });
-});
-
-/**
  * GET /api/guides — List generated guides
  */
 app.get('/api/guides', (req, res) => {
@@ -239,6 +232,31 @@ app.get('/api/guides/:name', (req, res) => {
 
   const markdown = readFileSync(mdPath, 'utf-8');
   res.json({ name, markdown });
+});
+
+/**
+ * POST /api/chat/edit — Ask AI to propose edits to the guide.
+ * Body: { message: string, markdown: string }
+ * Returns: { explanation: string, changes: [{ oldText, newText }] }
+ */
+app.post('/api/chat/edit', async (req, res) => {
+  try {
+    const { message, markdown } = req.body || {};
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Missing message' });
+    }
+    if (!markdown || typeof markdown !== 'string') {
+      return res.status(400).json({ error: 'No guide markdown provided. Generate a guide first.' });
+    }
+    const result = await proposeGuideEdit(
+      markdown.slice(0, 100000),
+      message.slice(0, 2000),
+    );
+    res.json(result);
+  } catch (err) {
+    logger.error(`API /chat/edit error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // SPA fallback

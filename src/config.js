@@ -61,7 +61,7 @@ export default {
 
   // Screenshot processing
   screenshot: {
-    quality: parseInt(process.env.SCREENSHOT_QUALITY || '90', 10),
+    quality: parseInt(process.env.SCREENSHOT_QUALITY || '100', 10),
     highlightColor: { r: 255, g: 0, b: 0, alpha: 1 },
     highlightStroke: 4,
     highlightPadding: 6,
