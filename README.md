@@ -2,7 +2,7 @@
 
 Generate step-by-step Azure lab guides in **CloudLabs format** with real screenshots. You perform the lab steps while the tool captures screenshots, then AI writes the formatted guide.
 
-## How It Works
+## How It Works :
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
