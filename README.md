@@ -2,7 +2,7 @@
 
 Generate step-by-step Azure lab guides in **CloudLabs format** with real screenshots. You perform the lab steps while the tool captures screenshots, then AI writes the formatted guide.
 
-## How It Works
+## How It Works :
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -41,14 +41,14 @@ Generate step-by-step Azure lab guides in **CloudLabs format** with real screens
 
 ## Quick Start
 
-### 1. Install
+### 1. Install :
 
 ```bash
 npm install
 npx playwright install chromium
 ```
 
-### 2. Configure `.env`
+### 2. Configure `.env` :
 
 ```bash
 cp .env.example .env
@@ -67,13 +67,13 @@ OPENAI_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 ```
 
-### 3. Run the Desktop App
+### 3. Run the Desktop App :
 
 ```bash
 npm run desktop
 ```
 
-### 4. Record a Lab Guide
+### 4. Record a Lab Guide :
 
 1. Enter lab title and Azure Portal URL in the recorder panel
 2. Click **Start** to begin recording
