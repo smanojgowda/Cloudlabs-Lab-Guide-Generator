@@ -57,7 +57,7 @@ function createWindow() {
 
     // Auth popups — modal window
     if (url.includes('login.microsoftonline.com') || url.includes('login.live.com') ||
-        url.includes('login.windows.net') || url.includes('msauth.net') || url.includes('msftauth.net')) {
+      url.includes('login.windows.net') || url.includes('msauth.net') || url.includes('msftauth.net')) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -69,7 +69,7 @@ function createWindow() {
 
     // Bastion + Azure URLs — frameless child window overlaid on portal area (window.opener works!)
     if (url.includes('azure.com') || url.includes('azure.net') ||
-        url.includes('microsoft.com') || url.includes('windows.net') || url.includes('office.com')) {
+      url.includes('microsoft.com') || url.includes('windows.net') || url.includes('office.com')) {
       console.log('[Popup] Opening Azure/Bastion as child window:', url);
       return {
         action: 'allow',
@@ -129,7 +129,7 @@ function createWindow() {
     // Check if this is an auth popup
     const childUrl = childWC.getURL() || '';
     const isAuth = childUrl.includes('login.microsoftonline.com') || childUrl.includes('login.live.com') ||
-                   childUrl.includes('msauth.net') || childUrl.includes('msftauth.net');
+      childUrl.includes('msauth.net') || childUrl.includes('msftauth.net');
 
     if (!isAuth) {
       // This is Bastion/Azure — embed as frameless child window over portal area
@@ -158,22 +158,30 @@ function createWindow() {
         bastionWindow = null;
         activeWebContents = portalWebContents;
         activeView = 'portal';
-        try { portalView.setBounds(lastPortalBounds); } catch {}
-        try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bastion-closed'); } catch {}
+        try { portalView.setBounds(lastPortalBounds); } catch { }
+        try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('bastion-closed'); } catch { }
       });
     }
 
     // Allow nested popups (auth chains from Bastion, etc.)
     childWC.setWindowOpenHandler(({ url }) => {
       if (url.includes('login.microsoftonline.com') || url.includes('login.live.com') ||
-          url.includes('msauth.net') || url.includes('msftauth.net') || url.includes('login.windows.net')) {
-        return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 720, parent: mainWindow, modal: true, autoHideMenuBar: true,
-          webPreferences: { nodeIntegration: false, contextIsolation: true, partition: 'persist:azure' } } };
+        url.includes('msauth.net') || url.includes('msftauth.net') || url.includes('login.windows.net')) {
+        return {
+          action: 'allow', overrideBrowserWindowOptions: {
+            width: 520, height: 720, parent: mainWindow, modal: true, autoHideMenuBar: true,
+            webPreferences: { nodeIntegration: false, contextIsolation: true, partition: 'persist:azure' }
+          }
+        };
       }
       if (url.includes('azure.com') || url.includes('azure.net') || url.includes('microsoft.com') || url.includes('windows.net')) {
-        return { action: 'allow', overrideBrowserWindowOptions: { parent: mainWindow, frame: false, skipTaskbar: true, autoHideMenuBar: true,
-          width: lastPortalBounds.width || 1000, height: lastPortalBounds.height || 700,
-          webPreferences: { nodeIntegration: false, contextIsolation: true, partition: 'persist:azure', sandbox: false } } };
+        return {
+          action: 'allow', overrideBrowserWindowOptions: {
+            parent: mainWindow, frame: false, skipTaskbar: true, autoHideMenuBar: true,
+            width: lastPortalBounds.width || 1000, height: lastPortalBounds.height || 700,
+            webPreferences: { nodeIntegration: false, contextIsolation: true, partition: 'persist:azure', sandbox: false }
+          }
+        };
       }
       shell.openExternal(url);
       return { action: 'deny' };
@@ -602,6 +610,78 @@ ipcMain.on('editor-save', (_, base64) => {
   if (editorWindow && !editorWindow.isDestroyed()) editorWindow.close();
 });
 
+// ── Missing IPC Handlers ──
+
+// Test Lab — token & form field persistence
+const settingsPath = join(__dirname, 'testlab-settings.json');
+
+function readSettings() {
+  try { return JSON.parse(readFileSync(settingsPath, 'utf-8')); } catch { return {}; }
+}
+function writeSettings(data) {
+  const existing = readSettings();
+  writeFileSync(settingsPath, JSON.stringify({ ...existing, ...data }, null, 2), 'utf-8');
+}
+
+ipcMain.handle('testlab-save-token', (_, token) => { writeSettings({ token }); return true; });
+ipcMain.handle('testlab-get-token', () => readSettings().token || '');
+ipcMain.handle('testlab-save-fields', (_, fields) => { writeSettings({ fields }); return true; });
+ipcMain.handle('testlab-get-fields', () => readSettings().fields || {});
+ipcMain.handle('testlab-open-external', (_, url) => { shell.openExternal(url); return true; });
+ipcMain.handle('testlab-open-path', (_, path) => { shell.openPath(path); return true; });
+
+// Import an entire folder of .md guide files
+ipcMain.handle('import-guide-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Guide Folder',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const folderPath = result.filePaths[0];
+  const files = readdirSync(folderPath)
+    .filter(f => f.endsWith('.md'))
+    .map(f => ({
+      filename: f,
+      filePath: join(folderPath, f),
+      markdown: readFileSync(join(folderPath, f), 'utf-8'),
+    }));
+  return { folderPath, files };
+});
+
+// Save a local file back to disk
+ipcMain.handle('save-local-file', async (_, { filePath, content }) => {
+  if (!filePath || !content) return false;
+  try { writeFileSync(filePath, content, 'utf-8'); return true; }
+  catch (err) { console.error('[SaveLocal] Failed:', err.message); return false; }
+});
+
+// Read a local image as data URI
+ipcMain.handle('read-local-image', async (_, absPath) => {
+  if (!absPath || !existsSync(absPath)) return null;
+  try {
+    const buffer = readFileSync(absPath);
+    const ext = absPath.split('.').pop().toLowerCase();
+    const mime = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  } catch (err) { console.error('[ReadImage] Failed:', err.message); return null; }
+});
+
+// AI Auto-Record stubs (no-op since AI auto-record depends on separate logic)
+ipcMain.handle('ai-get-events', async () => []);
+ipcMain.handle('ai-inject-auto-detect', async () => false);
+ipcMain.handle('ai-start-auto-record', async () => false);
+ipcMain.handle('ai-stop-auto-record', async () => false);
+ipcMain.handle('ai-pause-auto-record', async () => false);
+ipcMain.handle('ai-is-active', async () => false);
+
+// Hide/show portal view (for screenshot editor overlay)
+ipcMain.on('hide-portal-view', () => {
+  if (portalView) portalView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+});
+ipcMain.on('show-portal-view', () => {
+  if (portalView && activeView === 'portal') portalView.setBounds(lastPortalBounds);
+});
+
 // ── Launch ──
 
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -620,4 +700,4 @@ app.whenReady().then(async () => {
   mainWindow.on('closed', () => { mainWindow = null; app.quit(); });
 });
 
-app.on('window-all-closed', () => {});
+app.on('window-all-closed', () => { });

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Region Capture</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; background: transparent; cursor: crosshair; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    #hint {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); color: #fff; padding: 8px 18px; border-radius: 8px;
+      font-family: 'Segoe UI', sans-serif; font-size: 13px; pointer-events: none; z-index: 10;
+    }
+    #size-label {
+      position: absolute; display: none; background: rgba(0,0,0,0.7); color: #fff;
+      padding: 2px 8px; border-radius: 4px; font-family: 'Segoe UI', sans-serif;
+      font-size: 11px; pointer-events: none; z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="overlay"></canvas>
+  <div id="hint">Click and drag to select a region. Press Esc to cancel.</div>
+  <div id="size-label"></div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  const sizeLabel = document.getElementById('size-label');
+  let bgImage = null;
+  let startX = 0, startY = 0;
+  let isDragging = false;
+  let currentRect = null;
+
+  // Set canvas to full window size
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    redraw();
+  }
+  window.addEventListener('resize', resize);
+
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background screenshot
+    if (bgImage) {
+      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+    }
+
+    // Dim overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Clear the selected region (show it bright)
+    if (currentRect) {
+      const { x, y, w, h } = currentRect;
+      ctx.clearRect(x, y, w, h);
+      if (bgImage) {
+        ctx.drawImage(bgImage, x, y, w, h, x, y, w, h);
+      }
+
+      // Border
+      ctx.strokeStyle = '#7c3aed';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+
+      // Corner handles
+      const hs = 6;
+      ctx.fillStyle = '#7c3aed';
+      ctx.fillRect(x - hs/2, y - hs/2, hs, hs);
+      ctx.fillRect(x + w - hs/2, y - hs/2, hs, hs);
+      ctx.fillRect(x - hs/2, y + h - hs/2, hs, hs);
+      ctx.fillRect(x + w - hs/2, y + h - hs/2, hs, hs);
+    }
+  }
+
+  // Receive background image
+  window.snippingAPI.onInit((data) => {
+    const img = new Image();
+    img.onload = () => {
+      bgImage = img;
+      resize();
+    };
+    img.src = 'data:image/png;base64,' + data.base64;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    startX = e.clientX;
+    startY = e.clientY;
+    isDragging = true;
+    document.getElementById('hint').style.display = 'none';
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const x = Math.min(startX, e.clientX);
+    const y = Math.min(startY, e.clientY);
+    const w = Math.abs(e.clientX - startX);
+    const h = Math.abs(e.clientY - startY);
+    currentRect = { x, y, w, h };
+    redraw();
+
+    // Size label
+    sizeLabel.textContent = w + ' \u00D7 ' + h;
+    sizeLabel.style.left = (x + w + 8) + 'px';
+    sizeLabel.style.top = (y + h + 8) + 'px';
+    sizeLabel.style.display = 'block';
+  });
+
+  canvas.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    sizeLabel.style.display = 'none';
+
+    if (!currentRect || currentRect.w < 10 || currentRect.h < 10) {
+      currentRect = null;
+      redraw();
+      return;
+    }
+
+    // Extract region from background image at native resolution
+    if (bgImage) {
+      const scX = bgImage.width / canvas.width;
+      const scY = bgImage.height / canvas.height;
+      const cx = Math.round(currentRect.x * scX);
+      const cy = Math.round(currentRect.y * scY);
+      const cw = Math.round(currentRect.w * scX);
+      const ch = Math.round(currentRect.h * scY);
+
+      const regionCanvas = document.createElement('canvas');
+      regionCanvas.width = cw;
+      regionCanvas.height = ch;
+      const rc = regionCanvas.getContext('2d');
+      rc.drawImage(bgImage, cx, cy, cw, ch, 0, 0, cw, ch);
+
+      const b64 = regionCanvas.toDataURL('image/png').split(',')[1];
+      window.snippingAPI.done(b64);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      window.snippingAPI.cancel();
+    }
+  });
+})();
+</script>
+</body>
+</html>

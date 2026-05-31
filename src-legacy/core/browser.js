@@ -1,19 +1,10 @@
 /**
  * Browser lifecycle management — launch, context, cleanup
  */
+import { chromium } from 'playwright';
 import { existsSync } from 'fs';
 import config from '../config.js';
 import logger from '../utils/logger.js';
-
-// Lazy-load playwright only when actually needed (not in desktop/Electron mode)
-let chromium = null;
-async function getChromium() {
-  if (!chromium) {
-    const pw = await import('playwright');
-    chromium = pw.chromium;
-  }
-  return chromium;
-}
 
 let browser = null;
 let context = null;
@@ -42,8 +33,7 @@ export async function launch() {
   const hasAuth = existsSync(config.browser.authFile);
   logger.info(`Launching Chromium (auth=${hasAuth})`);
 
-  const chromiumModule = await getChromium();
-  browser = await chromiumModule.launch({
+  browser = await chromium.launch({
     headless: false,
     slowMo: config.browser.slowMo,
     args: [
@@ -77,7 +67,7 @@ export async function launch() {
 
   page.on('dialog', async (dialog) => {
     logger.debug(`Browser dialog: ${dialog.type()} — "${dialog.message()}"`);
-    await dialog.dismiss().catch(() => { });
+    await dialog.dismiss().catch(() => {});
   });
 
   page.on('crash', () => {
@@ -118,7 +108,7 @@ export function getContext() {
  */
 export async function close() {
   if (browser) {
-    await browser.close().catch(() => { });
+    await browser.close().catch(() => {});
     browser = null;
     context = null;
     page = null;
